@@ -1,1 +1,295 @@
-/* Global styles */
+// ============================================================
+// Naologic Design System
+// Extracted from Sketch: Work Order Schedule - FE Take-Home
+// ============================================================
+
+// ─── @font-face (Circular Std) ───────────────────────────────
+// Uncomment and add font files to src/assets/fonts/ when available
+// @font-face {
+//   font-family: 'Circular Std';
+//   src: url('/assets/fonts/CircularStd-Book.woff2') format('woff2');
+//   font-weight: 400;
+//   font-style: normal;
+// }
+// @font-face {
+//   font-family: 'Circular Std';
+//   src: url('/assets/fonts/CircularStd-Medium.woff2') format('woff2');
+//   font-weight: 500;
+//   font-style: normal;
+// }
+// @font-face {
+//   font-family: 'Circular Std';
+//   src: url('/assets/fonts/CircularStd-Bold.woff2') format('woff2');
+//   font-weight: 700;
+//   font-style: normal;
+// }
+
+// ─── Design Tokens ───────────────────────────────────────────
+:root {
+  // Typography
+  --font-family: 'Circular Std', -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --font-size-xs:   11px;
+  --font-size-sm:   12px;
+  --font-size-base: 13px;
+  --font-size-md:   14px;
+  --font-size-lg:   16px;
+  --font-size-xl:   20px;
+  --font-size-2xl:  24px;
+
+  // Brand / Primary (Naologic indigo)
+  --color-brand-900: #1e1b4b;
+  --color-brand-800: #312e81;
+  --color-brand-700: #3730a3;
+  --color-brand-600: #4338ca;
+  --color-brand-500: #4f46e5;   // primary interactive: "Month" selected, "In progress" badge text, buttons
+  --color-brand-400: #6366f1;
+  --color-brand-100: #e0e7ff;   // "In progress" bar fill, hover states
+  --color-brand-50:  #eef2ff;   // "In progress" badge bg, current-month column tint
+
+  // Neutral / Gray
+  --color-gray-900: #111827;   // primary text, headings, bar labels
+  --color-gray-800: #1f2937;   // tooltip bg, "Click to add dates"
+  --color-gray-700: #374151;   // secondary interactive text
+  --color-gray-600: #4b5563;
+  --color-gray-500: #6b7280;   // column headers, meta text, "Work Center" label
+  --color-gray-400: #9ca3af;   // placeholder, close button
+  --color-gray-300: #d1d5db;   // input borders
+  --color-gray-200: #e5e7eb;   // row dividers, panel borders, table grid lines
+  --color-gray-100: #f3f4f6;   // page bg, "Cancel" button, "Timescale" label bg
+  --color-gray-50:  #f9fafb;   // app shell background
+
+  // Status — Complete (green)
+  --color-complete-text:   #16a34a;
+  --color-complete-bg:     #dcfce7;
+  --color-complete-border: #bbf7d0;
+  --color-complete-bar:    #d1fae5;  // lighter bar fill
+
+  // Status — In Progress (indigo, reuses brand)
+  --color-inprogress-text:   var(--color-brand-500);
+  --color-inprogress-bg:     var(--color-brand-50);
+  --color-inprogress-border: var(--color-brand-100);
+  --color-inprogress-bar:    var(--color-brand-50);
+
+  // Status — Blocked (amber / orange)
+  --color-blocked-text:   #d97706;
+  --color-blocked-bg:     #fef3c7;
+  --color-blocked-border: #fde68a;
+  --color-blocked-bar:    #fef9c3;
+
+  // Status — Open (neutral gray)
+  --color-open-text:   var(--color-gray-500);
+  --color-open-bg:     var(--color-gray-100);
+  --color-open-border: var(--color-gray-200);
+  --color-open-bar:    var(--color-gray-100);
+
+  // Feedback
+  --color-error-text: #b91c1c;
+  --color-error-bg:   #fef2f2;
+  --color-error-border: #fecaca;
+
+  // Surfaces
+  --color-surface:          #ffffff;
+  --color-surface-subtle:   var(--color-gray-50);
+  --color-surface-raised:   #ffffff;
+
+  // Borders
+  --color-border:        var(--color-gray-200);
+  --color-border-subtle: var(--color-gray-100);
+
+  // ─── Layout ─────────────────────────────────────────────────
+
+  // Left "Work Center" column
+  --schedule-sidebar-width: 280px;
+
+  // Grid row / header
+  --schedule-row-height:     56px;
+  --schedule-header-height:  44px;
+
+  // Timeline column widths per zoom level
+  --timeline-col-day:   60px;
+  --timeline-col-week:  90px;
+  --timeline-col-month: 110px;
+
+  // Work-order bar
+  --bar-height:         36px;
+  --bar-border-radius:  8px;
+  --bar-font-size:      var(--font-size-base);
+  --bar-font-weight:    500;
+  --bar-padding-x:      12px;
+
+  // Status badge (pill inside bar)
+  --badge-height:         22px;
+  --badge-padding-x:      10px;
+  --badge-border-radius:  11px;  // full pill
+  --badge-font-size:      var(--font-size-xs);
+  --badge-font-weight:    600;
+
+  // "Current month" indicator pill
+  --current-month-bg:           var(--color-brand-500);
+  --current-month-text:         #ffffff;
+  --current-month-border-radius: 12px;
+  --current-month-padding:       2px 10px;
+  --current-month-font-size:     var(--font-size-sm);
+
+  // Timescale selector control
+  --timescale-bg:            var(--color-gray-100);
+  --timescale-border:        var(--color-gray-200);
+  --timescale-border-radius: 8px;
+  --timescale-active-bg:     var(--color-brand-50);
+  --timescale-active-text:   var(--color-brand-500);
+  --timescale-active-weight: 600;
+
+  // Slide-out panel
+  --panel-width:       380px;
+  --panel-shadow:      -4px 0 24px rgba(0, 0, 0, 0.10);
+  --panel-backdrop-bg: rgba(0, 0, 0, 0.15);
+
+  // Tooltip ("Click to add dates")
+  --tooltip-bg:            var(--color-gray-800);
+  --tooltip-text:          #ffffff;
+  --tooltip-border-radius: 6px;
+  --tooltip-padding:       5px 10px;
+  --tooltip-font-size:     var(--font-size-sm);
+
+  // Focus ring
+  --focus-ring: 0 0 0 3px rgba(99, 102, 241, 0.25);
+
+  // Transitions
+  --transition-fast: 0.12s ease;
+  --transition-base: 0.20s ease;
+}
+
+// ─── Reset & Base ────────────────────────────────────────────
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+  background: var(--color-surface-subtle);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// ─── Typography helpers ──────────────────────────────────────
+.nao-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-gray-900);
+  letter-spacing: -0.02em;
+}
+
+.nao-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+// ─── Status badge ────────────────────────────────────────────
+.nao-badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--badge-height);
+  padding: 0 var(--badge-padding-x);
+  border-radius: var(--badge-border-radius);
+  font-size: var(--badge-font-size);
+  font-weight: var(--badge-font-weight);
+  white-space: nowrap;
+  line-height: 1;
+
+  &--complete    { color: var(--color-complete-text);   background: var(--color-complete-bg); }
+  &--in-progress { color: var(--color-inprogress-text); background: var(--color-inprogress-bg); }
+  &--blocked     { color: var(--color-blocked-text);    background: var(--color-blocked-bg); }
+  &--open        { color: var(--color-open-text);       background: var(--color-open-bg); }
+}
+
+// ─── Timescale selector ──────────────────────────────────────
+.nao-timescale {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  border: 1px solid var(--timescale-border);
+  border-radius: var(--timescale-border-radius);
+  background: var(--timescale-bg);
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  user-select: none;
+
+  &__label {
+    padding: 0 12px;
+    color: var(--color-gray-500);
+    font-weight: 400;
+  }
+
+  &__divider {
+    width: 1px;
+    height: 18px;
+    background: var(--color-border);
+  }
+
+  &__value {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    color: var(--timescale-active-text);
+    font-weight: var(--timescale-active-weight);
+    cursor: pointer;
+    background: var(--timescale-active-bg);
+    height: 100%;
+
+    svg, .chevron { font-size: 10px; opacity: 0.7; }
+  }
+}
+
+// ─── "Current month" pill ────────────────────────────────────
+.nao-current-month {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--current-month-padding);
+  background: var(--current-month-bg);
+  color: var(--current-month-text);
+  border-radius: var(--current-month-border-radius);
+  font-size: var(--current-month-font-size);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+// ─── Tooltip ────────────────────────────────────────────────
+.nao-tooltip {
+  position: absolute;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  border-radius: var(--tooltip-border-radius);
+  padding: var(--tooltip-padding);
+  font-size: var(--tooltip-font-size);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+}
+
+// ─── Focus ──────────────────────────────────────────────────
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+// ─── Scrollbar (WebKit) ──────────────────────────────────────
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-gray-300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-gray-400); }
