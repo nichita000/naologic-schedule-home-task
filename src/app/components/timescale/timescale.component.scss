@@ -1,0 +1,87 @@
+// Nao Design System v2 — "Shadow/Light" drop shadow (no border ring)
+$ts-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
+
+// Hosted Circular-Std weight map: 400 Regular, 500 Book, 600 Medium, 700 Bold
+.nao-timescale {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--timescale-bg);
+  box-shadow: $ts-shadow;
+  font-size: var(--font-size-base);
+  user-select: none;
+
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--color-gray-500);
+    font-weight: 500; // Book
+    white-space: nowrap;
+  }
+
+  // "Month" — white raised segment, distinct from the gray label
+  &__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    background: var(--color-surface);
+    color: var(--color-brand-600);
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    font-weight: 600; // Medium
+    cursor: pointer;
+  }
+
+  &__chevron {
+    display: block;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: transform var(--transition-fast);
+  }
+
+  &--open &__chevron { transform: rotate(180deg); }
+
+  // Full-screen catcher so clicking anywhere outside closes the menu
+  &__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+  }
+
+  &__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 200px;
+    background: var(--color-surface);
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.06);
+    z-index: 50;
+    padding: 4px;
+  }
+
+  &__item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    font-weight: 500; // Book
+    color: #2f3059;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background var(--transition-fast);
+
+    &:hover { background: var(--color-gray-100); }
+    &--active { color: var(--color-brand-600); }
+  }
+}
