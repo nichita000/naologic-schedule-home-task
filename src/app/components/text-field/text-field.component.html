@@ -1,0 +1,14 @@
+<div class="nao-field" [class.nao-field--error]="error()" [class.nao-field--disabled]="disabled()">
+  @if (label()) {
+    <label class="nao-field__label">{{ label() }}</label>
+  }
+  <input
+    class="nao-field__input"
+    [placeholder]="placeholder()"
+    [disabled]="disabled()"
+    [(ngModel)]="value"
+  />
+  @if (error()) {
+    <span class="nao-field__error">{{ error() }}</span>
+  }
+</div>

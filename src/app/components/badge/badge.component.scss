@@ -1,0 +1,18 @@
+// Styles already defined globally in styles.scss as .nao-badge
+// This file intentionally left minimal — component inherits global tokens
+.nao-badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--badge-height);
+  padding: 0 var(--badge-padding-x);
+  border-radius: var(--badge-border-radius);
+  font-size: var(--badge-font-size);
+  font-weight: var(--badge-font-weight);
+  white-space: nowrap;
+  line-height: 1;
+
+  &--complete { color: var(--color-complete-text); background: var(--color-complete-bg); }
+  &--in-progress { color: var(--color-inprogress-text); background: var(--color-inprogress-bg); }
+  &--blocked { color: var(--color-blocked-text); background: var(--color-blocked-bg); }
+  &--open { color: var(--color-open-text); background: var(--color-open-bg); }
+}
