@@ -1,0 +1,31 @@
+<div class="nao-dropdown" [class.nao-dropdown--open]="open()">
+  <!-- Trigger: a consumer can project [naoDropdownTrigger]; otherwise the
+       default value trigger is shown. -->
+  <span class="nao-dropdown__trigger-slot" (click)="toggle()">
+    <ng-content select="[naoDropdownTrigger]">
+      <span class="nao-dropdown__trigger">
+        <span class="nao-dropdown__value">
+          {{ selected()?.label ?? placeholder() }}
+        </span>
+        <svg class="nao-dropdown__chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </ng-content>
+  </span>
+
+  @if (open()) {
+    <div class="nao-dropdown__menu" (mouseleave)="close()">
+      @for (opt of options(); track opt.value) {
+        <button
+          class="nao-dropdown__item"
+          [class.nao-dropdown__item--active]="selected()?.value === opt.value"
+          type="button"
+          (click)="select(opt)"
+        >
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+  }
+</div>
