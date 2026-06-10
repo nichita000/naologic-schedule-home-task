@@ -1,0 +1,9 @@
+<button
+  class="nao-btn"
+  [class]="'nao-btn--' + variant() + ' nao-btn--' + size()"
+  [type]="type()"
+  [disabled]="disabled()"
+  (click)="clicked.emit()"
+>
+  <ng-content />
+</button>

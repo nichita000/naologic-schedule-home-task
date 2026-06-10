@@ -1,0 +1,32 @@
+.nao-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--color-gray-100);
+    color: var(--color-gray-900);
+  }
+
+  &--dismiss {
+    color: var(--color-gray-400);
+
+    &:hover {
+      background: var(--color-gray-100);
+      color: var(--color-gray-700);
+    }
+  }
+
+  &--subtle {
+    color: var(--color-gray-500);
+  }
+}
