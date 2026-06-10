@@ -1,8 +1,10 @@
 import { Component } from '@angular/core';
+import { SchedulePageComponent } from './pages/schedule/schedule-page.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  template: `<h1 class="nao-title" style="padding:40px">Naologic Schedule</h1>`,
+  imports: [SchedulePageComponent],
+  template: `<app-schedule-page />`,
 })
 export class AppComponent {}

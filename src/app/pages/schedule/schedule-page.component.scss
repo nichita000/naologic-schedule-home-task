@@ -1,0 +1,23 @@
+.schedule-page {
+  min-height: 100vh;
+  background: var(--color-surface-muted);
+  padding: 46px 64px 80px;
+
+  &__logo {
+    display: block;
+    width: 121px;
+    height: auto;
+  }
+
+  &__content {
+    margin-top: 86px;
+  }
+
+  &__title {
+    margin: 0 0 32px;
+    color: var(--color-ink-900);
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+}

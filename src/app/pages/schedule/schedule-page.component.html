@@ -1,0 +1,9 @@
+<main class="schedule-page">
+  <img class="schedule-page__logo" src="assets/naologic-logo.svg" alt="Naologic" />
+
+  <section class="schedule-page__content">
+    <h1 class="schedule-page__title">Work Orders</h1>
+
+    <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+  </section>
+</main>
