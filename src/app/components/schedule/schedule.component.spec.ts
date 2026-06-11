@@ -5,6 +5,7 @@ import { ScheduleComponent } from './schedule.component';
 
 describe('ScheduleComponent', () => {
   let fixture: ComponentFixture<ScheduleComponent>;
+  let component: ScheduleComponent;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -12,6 +13,7 @@ describe('ScheduleComponent', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(ScheduleComponent);
+    component = fixture.componentInstance;
     fixture.componentRef.setInput('workCenters', [
       { id: 'wc-1', name: 'Extrusion Line A' },
       { id: 'wc-2', name: 'CNC Machine 1' },
@@ -58,4 +60,43 @@ describe('ScheduleComponent', () => {
     expect(bar?.textContent).toContain('Casing Extrusion');
     expect(bar?.textContent).toContain('Complete');
   });
+
+  it('previews an add pill on an empty timeline slot', () => {
+    component.onRowMove(mockRowMove(114 * 4 + 70), 'wc-1');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(component.hoverPlacement()).toEqual({
+      left: 456,
+      width: 114,
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+    });
+    expect(host.querySelector('.schedule__add')).not.toBeNull();
+  });
+
+  it('emits add requests from the preview pill', () => {
+    const emitted: string[] = [];
+    fixture.componentInstance.addWorkOrder.subscribe(request => {
+      emitted.push(`${request.workCenterId}:${request.startDate}:${request.endDate}`);
+    });
+
+    component.onRowMove(mockRowMove(114 * 4 + 70), 'wc-1');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.querySelector<HTMLButtonElement>('.schedule__add')?.click();
+
+    expect(emitted).toEqual(['wc-1:2026-09-01:2026-09-30']);
+  });
+
+  function mockRowMove(x: number): MouseEvent {
+    return {
+      clientX: x,
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 0 }),
+      },
+    } as unknown as MouseEvent;
+  }
 });

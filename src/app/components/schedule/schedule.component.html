@@ -33,7 +33,7 @@
           [scrollable]="false"
         />
 
-        <div class="schedule__gantt-space" aria-hidden="true">
+        <div class="schedule__gantt-space">
           <div class="schedule__vertical-lines">
             @for (cell of timelineCells(); track cell.key) {
               @if (cell.left > 0) {
@@ -60,8 +60,8 @@
             <div
               class="schedule__gantt-row"
               [class.schedule__gantt-row--hovered]="hoveredRowId() === wc.id"
-              (mouseenter)="setHoveredRow(wc.id)"
-              (mouseleave)="setHoveredRow(null)"
+              (mousemove)="onRowMove($event, wc.id)"
+              (mouseleave)="clearHover()"
             >
               @for (order of placedByCenter()[wc.id]; track order.id) {
                 <div
@@ -74,6 +74,22 @@
                     [status]="order.status"
                   />
                 </div>
+              }
+
+              @if (hoveredRowId() === wc.id && hoverPlacement(); as placement) {
+                @for (slot of [placement]; track slot.left + '-' + slot.width) {
+                  <button
+                    type="button"
+                    class="schedule__add"
+                    [style.width.px]="slot.width - 16"
+                    [style.transform]="'translate(' + (slot.left + 8) + 'px, -50%)'"
+                    naoTooltip="Click to add dates"
+                    [naoTooltipWhenTruncated]="false"
+                    naoTooltipPosition="top"
+                    [naoTooltipDebounce]="400"
+                    (click)="onAddWorkOrder(wc.id)"
+                  ></button>
+                }
               }
             </div>
           }

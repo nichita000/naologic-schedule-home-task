@@ -168,3 +168,16 @@
   min-width: 0;
   transform: translateY(-50%);
 }
+
+.schedule__add {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 2;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(195, 199, 255, 1);
+  border-radius: 8px;
+  background-color: rgba(101, 112, 255, 0.1);
+  cursor: pointer;
+}

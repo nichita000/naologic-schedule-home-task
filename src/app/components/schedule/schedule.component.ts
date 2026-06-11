@@ -1,14 +1,16 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, input, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   buildRulerCells,
   findCurrentCellLeft,
+  offsetRangeToDateRange,
   placeBar,
   ScheduleRulerComponent,
   ScheduleRulerScale,
 } from '../schedule-ruler/schedule-ruler.component';
 import { Timescale } from '../timescale/timescale.component';
 import { BadgeStatus } from '../badge/badge.component';
+import { TooltipDirective } from '../tooltip/tooltip.directive';
 import { WorkOrderComponent } from '../work-order/work-order.component';
 
 export interface WorkCenter {
@@ -30,10 +32,25 @@ export interface PlacedOrder extends ScheduleOrder {
   width: number;
 }
 
+export interface AddWorkOrderRequest {
+  workCenterId: string;
+  left: number;
+  width: number;
+  startDate: string;
+  endDate: string;
+}
+
+interface HoverPlacement {
+  left: number;
+  width: number;
+  startDate: string;
+  endDate: string;
+}
+
 @Component({
   selector: 'nao-schedule',
   standalone: true,
-  imports: [CommonModule, ScheduleRulerComponent, WorkOrderComponent],
+  imports: [CommonModule, ScheduleRulerComponent, TooltipDirective, WorkOrderComponent],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -48,7 +65,10 @@ export class ScheduleComponent implements AfterViewInit {
   readonly timelineEndDate = input.required<string>();
   readonly currentDate = input<string | null>(null);
 
+  readonly addWorkOrder = output<AddWorkOrderRequest>();
+
   readonly hoveredRowId = signal<string | null>(null);
+  readonly hoverPlacement = signal<HoverPlacement | null>(null);
   private readonly viewReady = signal(false);
 
   readonly rulerScale = computed<ScheduleRulerScale>(() => {
@@ -79,6 +99,17 @@ export class ScheduleComponent implements AfterViewInit {
     }
 
     return map;
+  });
+
+  readonly placementWidth = computed(() => {
+    switch (this.rulerScale()) {
+      case Timescale.Day:
+        return 64;
+      case Timescale.Week:
+        return 150;
+      default:
+        return 114;
+    }
   });
 
   readonly currentMarker = computed<{ left: number; label: string } | null>(() => {
@@ -124,6 +155,35 @@ export class ScheduleComponent implements AfterViewInit {
     this.hoveredRowId.set(id);
   }
 
+  onRowMove(event: MouseEvent, id: string): void {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    this.hoveredRowId.set(id);
+
+    const orders = this.placedByCenter()[id] ?? [];
+    if (orders.some(order => x >= order.left && x < order.left + order.width)) {
+      this.hoverPlacement.set(null);
+      return;
+    }
+
+    this.hoverPlacement.set(this.findAvailablePlacement(x, orders));
+  }
+
+  clearHover(): void {
+    this.hoveredRowId.set(null);
+    this.hoverPlacement.set(null);
+  }
+
+  onAddWorkOrder(workCenterId: string): void {
+    const placement = this.hoverPlacement();
+
+    if (!placement) {
+      return;
+    }
+
+    this.addWorkOrder.emit({ workCenterId, ...placement });
+  }
+
   private today(): Date {
     const value = this.currentDate();
     return value ? new Date(value) : new Date();
@@ -149,5 +209,49 @@ export class ScheduleComponent implements AfterViewInit {
       default:
         return 114;
     }
+  }
+
+  private findAvailablePlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
+    const scale = this.rulerScale();
+    const width = this.placementWidth();
+    const preferredLeft = Math.floor(Math.max(0, x) / width) * width;
+    const maxLeft = Math.max(0, this.timelineWidth() - width);
+    const preferredIndex = Math.floor(Math.min(Math.max(preferredLeft, 0), maxLeft) / width);
+    const maxIndex = Math.floor(maxLeft / width);
+    const candidates = this.buildPlacementCandidateIndexes(preferredIndex, maxIndex);
+
+    for (const index of candidates) {
+      const left = index * width;
+      const range = offsetRangeToDateRange(scale, this.timelineStartDate(), left, width);
+
+      if (!this.overlapsAny(range.startDate, range.endDate, orders)) {
+        return { left, width, ...range };
+      }
+    }
+
+    return null;
+  }
+
+  private buildPlacementCandidateIndexes(preferredIndex: number, maxIndex: number): number[] {
+    const result: number[] = [];
+
+    for (let distance = 0; distance <= maxIndex; distance += 1) {
+      const right = preferredIndex + distance;
+      const left = preferredIndex - distance;
+
+      if (right <= maxIndex) {
+        result.push(right);
+      }
+
+      if (distance > 0 && left >= 0) {
+        result.push(left);
+      }
+    }
+
+    return result;
+  }
+
+  private overlapsAny(startDate: string, endDate: string, orders: PlacedOrder[]): boolean {
+    return orders.some(order => startDate <= order.endDate && endDate >= order.startDate);
   }
 }
