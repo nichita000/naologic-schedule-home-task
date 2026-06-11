@@ -66,6 +66,7 @@
               @for (order of visibleBarsByCenter()[wc.id]; track order.id) {
                 <div
                   class="schedule__bar"
+                  [class.schedule__bar--focused]="focusedOrderId() === order.id"
                   [style.width.px]="order.width - 8"
                   [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
                 >
@@ -127,6 +128,7 @@
                             type="button"
                             class="schedule__compact-popover-action"
                             aria-label="Open compact work order"
+                            (click)="onCompactOrderFocus(order)"
                           >
                             →
                           </button>

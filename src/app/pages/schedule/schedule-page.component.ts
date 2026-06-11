@@ -32,6 +32,8 @@ export class SchedulePageComponent {
   readonly drawerOpen = signal(false);
   /** Order awaiting delete confirmation; the dialog is open while non-null. */
   readonly deleteTarget = signal<ScheduleOrder | null>(null);
+  readonly focusDate = signal<string | null>(null);
+  readonly focusedOrderId = signal<string | null>(null);
   readonly workCenters = this.scheduleStore.workCenters;
   readonly workOrders = this.scheduleStore.workOrders;
   readonly timelineStartDate = `${new Date().getFullYear() - 2}-01-01`;
@@ -39,6 +41,16 @@ export class SchedulePageComponent {
 
   setTimescale(value: Timescale): void {
     this.timescale.set(value);
+    this.focusDate.set(null);
+    this.focusedOrderId.set(null);
+  }
+
+  focusCompactOrder(order: ScheduleOrder): void {
+    const duration = this.durationInDays(order.startDate, order.endDate);
+
+    this.timescale.set(duration <= 3 ? Timescale.Day : Timescale.Week);
+    this.focusDate.set(order.startDate);
+    this.focusedOrderId.set(order.id);
   }
 
   openCreate(request: AddWorkOrderRequest): void {
@@ -153,5 +165,14 @@ export class SchedulePageComponent {
     const month = `${date.getMonth() + 1}`.padStart(2, '0');
     const day = `${date.getDate()}`.padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private durationInDays(startDate: string, endDate: string): number {
+    const DAY_MS = 86_400_000;
+    const start = this.parseIsoDate(startDate);
+    const end = this.parseIsoDate(endDate);
+    const utcStart = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+    const utcEnd = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+    return Math.round((utcEnd - utcStart) / DAY_MS) + 1;
   }
 }

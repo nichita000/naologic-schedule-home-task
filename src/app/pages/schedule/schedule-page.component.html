@@ -13,8 +13,11 @@
         [scale]="timescale()"
         [timelineStartDate]="timelineStartDate"
         [timelineEndDate]="timelineEndDate"
+        [focusDate]="focusDate()"
+        [focusedOrderId]="focusedOrderId()"
         (addWorkOrder)="openCreate($event)"
         (orderAction)="handleOrderAction($event)"
+        (compactOrderFocus)="focusCompactOrder($event)"
       />
     </div>
   </section>

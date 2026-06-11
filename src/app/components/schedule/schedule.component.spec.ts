@@ -103,6 +103,29 @@ describe('ScheduleComponent', () => {
     expect(component.hoverPlacement()).toBeNull();
   });
 
+  it('emits a focus request from compact popover actions', () => {
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-1',
+        name: 'Laser Alignment',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-10-06',
+        endDate: '2026-10-06',
+      },
+    ]);
+    const focused: string[] = [];
+    component.compactOrderFocus.subscribe(order => focused.push(order.id));
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    host.querySelector<HTMLButtonElement>('.schedule__compact')?.click();
+    fixture.detectChanges();
+    host.querySelector<HTMLButtonElement>('.schedule__compact-popover-action')?.click();
+
+    expect(focused).toEqual(['wo-1']);
+  });
+
   it('previews an add pill on an empty timeline slot', () => {
     component.onRowMove(mockRowMove(114 * 4 + 70), 'wc-1');
     fixture.detectChanges();

@@ -78,9 +78,12 @@ export class ScheduleComponent implements AfterViewInit {
   readonly timelineStartDate = input.required<string>();
   readonly timelineEndDate = input.required<string>();
   readonly currentDate = input<string | null>(null);
+  readonly focusDate = input<string | null>(null);
+  readonly focusedOrderId = input<string | null>(null);
 
   readonly addWorkOrder = output<AddWorkOrderRequest>();
   readonly orderAction = output<{ order: ScheduleOrder; action: WorkOrderAction }>();
+  readonly compactOrderFocus = output<ScheduleOrder>();
 
   readonly hoveredRowId = signal<string | null>(null);
   readonly hoverPlacement = signal<HoverPlacement | null>(null);
@@ -195,13 +198,20 @@ export class ScheduleComponent implements AfterViewInit {
       this.timelineStartDate();
       this.timelineEndDate();
       this.currentDate();
+      this.focusDate();
       this.timelineWidth();
 
       if (!this.viewReady()) {
         return;
       }
 
-      queueMicrotask(() => this.scrollToCurrentPeriodLeadIn());
+      queueMicrotask(() => {
+        if (this.focusDate()) {
+          this.scrollToFocusDate();
+        } else {
+          this.scrollToCurrentPeriodLeadIn();
+        }
+      });
     });
   }
 
@@ -268,6 +278,11 @@ export class ScheduleComponent implements AfterViewInit {
     this.orderAction.emit({ order, action });
   }
 
+  onCompactOrderFocus(order: ScheduleOrder): void {
+    this.activeCompactGroup.set(null);
+    this.compactOrderFocus.emit(order);
+  }
+
   statusClass(status: BadgeStatus): string {
     return `schedule__compact-dot--${status}`;
   }
@@ -295,6 +310,18 @@ export class ScheduleComponent implements AfterViewInit {
     }
 
     element.scrollLeft = Math.max(marker.left - this.cellWidth(), 0);
+  }
+
+  private scrollToFocusDate(): void {
+    const element = this.timelineScroll?.nativeElement;
+    const focusDate = this.focusDate();
+
+    if (!element || !focusDate) {
+      return;
+    }
+
+    const { left } = placeBar(this.rulerScale(), this.timelineStartDate(), focusDate, focusDate);
+    element.scrollLeft = Math.max(left - this.cellWidth(), 0);
   }
 
   private cellWidth(): number {
