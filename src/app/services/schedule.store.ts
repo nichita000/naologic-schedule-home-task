@@ -1,10 +1,13 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { BadgeStatus } from '../components/badge/badge.component';
 import { ScheduleOrder, WorkCenter } from '../components/schedule/schedule.component';
 import { WORK_CENTERS, WORK_ORDERS } from '../data/schedule-seed';
+import { LocalScheduleStorageService } from './local-schedule-storage.service';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleStore {
+  private readonly storage = inject(LocalScheduleStorageService);
+
   private readonly workCentersState = signal<WorkCenter[]>(
     WORK_CENTERS.map(doc => ({
       id: doc.docId,
@@ -12,16 +15,7 @@ export class ScheduleStore {
     }))
   );
 
-  private readonly workOrdersState = signal<ScheduleOrder[]>(
-    WORK_ORDERS.map(doc => ({
-      id: doc.docId,
-      name: doc.data.name,
-      workCenterId: doc.data.workCenterId,
-      status: doc.data.status as BadgeStatus,
-      startDate: doc.data.startDate,
-      endDate: doc.data.endDate,
-    }))
-  );
+  private readonly workOrdersState = signal<ScheduleOrder[]>(this.loadInitialWorkOrders());
 
   readonly workCenters = this.workCentersState.asReadonly();
   readonly workOrders = this.workOrdersState.asReadonly();
@@ -39,15 +33,31 @@ export class ScheduleStore {
       ...order,
       id: `wo-${Date.now()}`,
     };
-    this.workOrdersState.update(orders => [...orders, created]);
+    this.setWorkOrders([...this.workOrdersState(), created]);
     return created;
   }
 
   updateWorkOrder(order: ScheduleOrder): void {
-    this.workOrdersState.update(orders => orders.map(item => item.id === order.id ? order : item));
+    this.setWorkOrders(this.workOrdersState().map(item => item.id === order.id ? order : item));
   }
 
   deleteWorkOrder(id: string): void {
-    this.workOrdersState.update(orders => orders.filter(order => order.id !== id));
+    this.setWorkOrders(this.workOrdersState().filter(order => order.id !== id));
+  }
+
+  private setWorkOrders(workOrders: ScheduleOrder[]): void {
+    this.workOrdersState.set(workOrders);
+    this.storage.saveWorkOrders(workOrders);
+  }
+
+  private loadInitialWorkOrders(): ScheduleOrder[] {
+    return this.storage.loadWorkOrders() ?? WORK_ORDERS.map(doc => ({
+      id: doc.docId,
+      name: doc.data.name,
+      workCenterId: doc.data.workCenterId,
+      status: doc.data.status as BadgeStatus,
+      startDate: doc.data.startDate,
+      endDate: doc.data.endDate,
+    }));
   }
 }

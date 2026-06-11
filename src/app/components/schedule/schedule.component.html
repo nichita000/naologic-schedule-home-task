@@ -15,7 +15,7 @@
   </aside>
 
   <div class="schedule__canvas">
-    <div class="schedule__timeline-scroll" #timelineScroll>
+    <div class="schedule__timeline-scroll" #timelineScroll (scroll)="onTimelineScroll($event)">
       <div class="schedule__timeline-track" [style.width.px]="timelineWidth()">
         @if (currentMarker(); as marker) {
           <div
@@ -31,11 +31,12 @@
           [startDate]="timelineStartDate()"
           [endDate]="timelineEndDate()"
           [scrollable]="false"
+          [renderWindow]="renderWindow()"
         />
 
         <div class="schedule__gantt-space">
           <div class="schedule__vertical-lines">
-            @for (cell of timelineCells(); track cell.key) {
+            @for (cell of visibleTimelineCells(); track cell.key) {
               @if (cell.left > 0) {
                 <span
                   class="schedule__vertical-line"

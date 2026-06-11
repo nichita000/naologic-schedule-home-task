@@ -36,6 +36,24 @@ describe('ScheduleRulerComponent', () => {
     expect(cells.map(cell => cell.left)).toEqual([0, 114, 228]);
   });
 
+  it('uses the host render window when the parent owns horizontal scroll', () => {
+    fixture.componentRef.setInput('scrollable', false);
+    fixture.componentRef.setInput('scale', Timescale.Day);
+    fixture.componentRef.setInput('startDate', '2026-01-01');
+    fixture.componentRef.setInput('endDate', '2026-01-10');
+    fixture.componentRef.setInput('renderWindow', { start: 400, end: 800 });
+    fixture.detectChanges();
+
+    const cells = fixture.debugElement.queryAll(By.css('.nao-schedule-ruler__cell'));
+
+    expect(cells.map(cell => cell.nativeElement.textContent.trim())).toEqual([
+      'Jan 2',
+      'Jan 3',
+      'Jan 4',
+      'Jan 5',
+    ]);
+  });
+
   it('renders week labels as date ranges with a year', () => {
     const cells = buildRulerCells(Timescale.Week, '2024-08-01', '2024-08-14');
 

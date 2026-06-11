@@ -37,6 +37,8 @@ export class ScheduleRulerComponent implements AfterViewInit, OnDestroy {
   readonly endDate = input<string>('2027-12-31');
   readonly scrollable = input<boolean>(true);
   readonly viewportWidth = input<number>(914);
+  /** Pixel window from the host when it owns the scroll (scrollable=false). */
+  readonly renderWindow = input<{ start: number; end: number } | null>(null);
 
   readonly cells = computed(() => buildRulerCells(this.scale(), this.startDate(), this.endDate()));
   readonly totalWidth = computed(() => this.cells().reduce((sum, cell) => sum + cell.width, 0));
@@ -46,7 +48,15 @@ export class ScheduleRulerComponent implements AfterViewInit, OnDestroy {
 
   readonly visibleCells = computed(() => {
     if (!this.scrollable()) {
-      return this.cells();
+      const window = this.renderWindow();
+
+      if (!window) {
+        return this.cells();
+      }
+
+      return this.cells().filter(
+        cell => cell.left + cell.width >= window.start && cell.left <= window.end
+      );
     }
 
     const overscan = 2;
