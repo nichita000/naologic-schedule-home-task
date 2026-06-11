@@ -5,7 +5,7 @@ import { WorkCenterDocument, WorkOrderDocument } from '../models/work-order.mode
  *
  * Demonstrates the spec requirements:
  * - 5 work centers with realistic manufacturing names
- * - 14 work orders across them, covering all 4 statuses
+ * - 18 work orders across them, covering all 4 statuses
  * - Several centers carry multiple, non-overlapping orders (wc-1, wc-3, wc-4)
  * - Short orders that compact into status markers at wider timescales
  * - Multi-month spans so every bar is legible even at Month zoom, all within the
@@ -92,6 +92,26 @@ export const WORK_ORDERS: WorkOrderDocument[] = [
     docId: 'wo-14',
     docType: 'workOrder',
     data: { name: 'Spot Check #2', workCenterId: 'wc-4', status: 'open', startDate: '2026-10-10', endDate: '2026-10-11' },
+  },
+  {
+    docId: 'wo-15',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #3', workCenterId: 'wc-4', status: 'in-progress', startDate: '2026-10-12', endDate: '2026-10-12' },
+  },
+  {
+    docId: 'wo-16',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #4', workCenterId: 'wc-4', status: 'blocked', startDate: '2026-10-13', endDate: '2026-10-13' },
+  },
+  {
+    docId: 'wo-17',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #5', workCenterId: 'wc-4', status: 'complete', startDate: '2026-10-14', endDate: '2026-10-14' },
+  },
+  {
+    docId: 'wo-18',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #6', workCenterId: 'wc-4', status: 'open', startDate: '2026-10-15', endDate: '2026-10-15' },
   },
 
   // Packaging Line — single open order

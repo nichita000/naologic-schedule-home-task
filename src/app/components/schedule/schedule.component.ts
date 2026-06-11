@@ -136,7 +136,8 @@ export class ScheduleComponent implements AfterViewInit {
 
   readonly compactGroupsByCenter = computed<Record<string, CompactOrderGroup[]>>(() => {
     const map: Record<string, CompactOrderGroup[]> = {};
-    const slot = placementSlotWidthFor(this.rulerScale());
+    const scale = this.rulerScale();
+    const slot = placementSlotWidthFor(scale);
 
     for (const center of this.workCenters()) {
       map[center.id] = [];
@@ -150,7 +151,7 @@ export class ScheduleComponent implements AfterViewInit {
           continue;
         }
 
-        const key = Math.round(order.left / slot) * slot;
+        const key = this.compactGroupLeft(order.left, slot);
         groups.set(key, [...(groups.get(key) ?? []), order]);
       }
 
@@ -287,6 +288,18 @@ export class ScheduleComponent implements AfterViewInit {
     return `schedule__compact-dot--${status}`;
   }
 
+  visibleCompactDots(group: CompactOrderGroup): PlacedOrder[] {
+    return group.orders.slice(0, Math.min(group.orders.length, 2));
+  }
+
+  hiddenCompactCount(group: CompactOrderGroup): number {
+    return Math.max(group.orders.length - this.visibleCompactDots(group).length, 0);
+  }
+
+  hasMultipleCompactOrders(group: CompactOrderGroup): boolean {
+    return group.orders.length > 1;
+  }
+
   compactGroupRange(group: CompactOrderGroup): string {
     const dates = group.orders.flatMap(order => [order.startDate, order.endDate]).sort();
     return formatDateRange(dates[0], dates[dates.length - 1]);
@@ -381,6 +394,16 @@ export class ScheduleComponent implements AfterViewInit {
 
   private overlapsAny(startDate: string, endDate: string, orders: PlacedOrder[]): boolean {
     return orders.some(order => startDate <= order.endDate && endDate >= order.startDate);
+  }
+
+  private compactGroupLeft(left: number, slot: number): number {
+    if (this.rulerScale() !== Timescale.Month) {
+      return Math.round(left / slot) * slot;
+    }
+
+    const monthWidth = this.placementWidth();
+    const monthLeft = Math.floor(left / monthWidth) * monthWidth;
+    return monthLeft + monthWidth / 2;
   }
 
   private isCompactOrder(order: PlacedOrder): boolean {

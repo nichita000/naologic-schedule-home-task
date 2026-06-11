@@ -89,29 +89,32 @@
                   [style.transform]="'translate(' + (group.left + 8) + 'px, -50%)'"
                   (click)="toggleCompactGroup(wc.id, group.left); $event.stopPropagation()"
                 >
-                  @for (order of group.orders.slice(0, 2); track order.id) {
+                  @for (order of visibleCompactDots(group); track order.id) {
                     <span
                       class="schedule__compact-dot"
                       [ngClass]="statusClass(order.status)"
                     ></span>
                   }
 
-                  @if (group.orders.length > 2) {
-                    <span class="schedule__compact-count">+{{ group.orders.length - 2 }}</span>
+                  @if (hiddenCompactCount(group) > 0) {
+                    <span class="schedule__compact-count">+{{ hiddenCompactCount(group) }}</span>
                   }
                 </button>
 
                 @if (isCompactGroupOpen(wc.id, group.left)) {
                   <div
                     class="schedule__compact-popover"
+                    [class.schedule__compact-popover--single]="!hasMultipleCompactOrders(group)"
                     [style.transform]="'translate(' + (group.left + 8) + 'px, 28px)'"
                     (click)="$event.stopPropagation()"
                   >
-                    <header class="schedule__compact-popover-head">
-                      <strong>Work orders</strong>
-                      <span>{{ compactGroupRange(group) }}</span>
-                      <small>{{ group.orders.length }} total</small>
-                    </header>
+                    @if (hasMultipleCompactOrders(group)) {
+                      <header class="schedule__compact-popover-head">
+                        <strong>Work orders</strong>
+                        <span>{{ compactGroupRange(group) }}</span>
+                        <small>{{ group.orders.length }} total</small>
+                      </header>
+                    }
 
                     <div class="schedule__compact-popover-list">
                       @for (order of group.orders; track order.id) {

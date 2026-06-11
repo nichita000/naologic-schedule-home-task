@@ -99,8 +99,49 @@ describe('ScheduleComponent', () => {
     fixture.detectChanges();
 
     expect(host.querySelector('.schedule__compact-popover')?.textContent).toContain('Laser Alignment');
-    expect(host.querySelector('.schedule__compact-popover')?.textContent).toContain('Work orders');
+    expect(host.querySelector('.schedule__compact-popover')?.textContent).not.toContain('Work orders');
     expect(component.hoverPlacement()).toBeNull();
+  });
+
+  it('summarizes compact groups with overflow counts and a grouped popover header', () => {
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-1',
+        name: 'Spot Check #1',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Complete,
+        startDate: '2026-10-08',
+        endDate: '2026-10-08',
+      },
+      {
+        id: 'wo-2',
+        name: 'Spot Check #2',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-10-09',
+        endDate: '2026-10-09',
+      },
+      {
+        id: 'wo-3',
+        name: 'Spot Check #3',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-10-10',
+        endDate: '2026-10-10',
+      },
+    ]);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const marker = host.querySelector<HTMLButtonElement>('.schedule__compact');
+
+    expect(marker?.textContent).toContain('+1');
+
+    marker?.click();
+    fixture.detectChanges();
+
+    expect(host.querySelector('.schedule__compact-popover')?.textContent).toContain('Work orders');
+    expect(host.querySelector('.schedule__compact-popover')?.textContent).toContain('3 total');
   });
 
   it('emits a focus request from compact popover actions', () => {
