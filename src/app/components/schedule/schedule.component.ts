@@ -33,6 +33,11 @@ export interface PlacedOrder extends ScheduleOrder {
   width: number;
 }
 
+interface CompactOrderGroup {
+  left: number;
+  orders: PlacedOrder[];
+}
+
 export interface AddWorkOrderRequest {
   workCenterId: string;
   left: number;
@@ -100,6 +105,48 @@ export class ScheduleComponent implements AfterViewInit {
     for (const order of this.workOrders()) {
       const { left, width } = placeBar(scale, start, order.startDate, order.endDate);
       (map[order.workCenterId] ??= []).push({ ...order, left, width });
+    }
+
+    return map;
+  });
+
+  readonly visibleBarsByCenter = computed<Record<string, PlacedOrder[]>>(() => {
+    const map: Record<string, PlacedOrder[]> = {};
+
+    for (const center of this.workCenters()) {
+      map[center.id] = [];
+    }
+
+    for (const [workCenterId, orders] of Object.entries(this.placedByCenter())) {
+      map[workCenterId] = orders.filter(order => !this.isCompactOrder(order));
+    }
+
+    return map;
+  });
+
+  readonly compactGroupsByCenter = computed<Record<string, CompactOrderGroup[]>>(() => {
+    const map: Record<string, CompactOrderGroup[]> = {};
+    const slot = placementSlotWidthFor(this.rulerScale());
+
+    for (const center of this.workCenters()) {
+      map[center.id] = [];
+    }
+
+    for (const [workCenterId, orders] of Object.entries(this.placedByCenter())) {
+      const groups = new Map<number, PlacedOrder[]>();
+
+      for (const order of orders) {
+        if (!this.isCompactOrder(order)) {
+          continue;
+        }
+
+        const key = Math.round(order.left / slot) * slot;
+        groups.set(key, [...(groups.get(key) ?? []), order]);
+      }
+
+      map[workCenterId] = [...groups.entries()]
+        .map(([left, groupedOrders]) => ({ left, orders: groupedOrders }))
+        .sort((a, b) => a.left - b.left);
     }
 
     return map;
@@ -192,6 +239,10 @@ export class ScheduleComponent implements AfterViewInit {
     this.orderAction.emit({ order, action });
   }
 
+  statusClass(status: BadgeStatus): string {
+    return `schedule__compact-dot--${status}`;
+  }
+
   private today(): Date {
     const value = this.currentDate();
     return value ? new Date(value) : new Date();
@@ -265,5 +316,17 @@ export class ScheduleComponent implements AfterViewInit {
 
   private overlapsAny(startDate: string, endDate: string, orders: PlacedOrder[]): boolean {
     return orders.some(order => startDate <= order.endDate && endDate >= order.startDate);
+  }
+
+  private isCompactOrder(order: PlacedOrder): boolean {
+    switch (this.rulerScale()) {
+      case Timescale.Month:
+        return order.width <= 57;
+      case Timescale.Week:
+        return order.width <= 150;
+      case Timescale.Day:
+      default:
+        return false;
+    }
   }
 }

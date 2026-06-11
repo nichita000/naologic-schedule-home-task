@@ -5,8 +5,9 @@ import { WorkCenterDocument, WorkOrderDocument } from '../models/work-order.mode
  *
  * Demonstrates the spec requirements:
  * - 5 work centers with realistic manufacturing names
- * - 9 work orders across them, covering all 4 statuses
+ * - 14 work orders across them, covering all 4 statuses
  * - Several centers carry multiple, non-overlapping orders (wc-1, wc-3, wc-4)
+ * - Short orders that compact into status markers at wider timescales
  * - Multi-month spans so every bar is legible even at Month zoom, all within the
  *   visible range (timeline starts one month before "today" = 2026-06-09)
  */
@@ -43,6 +44,21 @@ export const WORK_ORDERS: WorkOrderDocument[] = [
     docType: 'workOrder',
     data: { name: 'Spindle Bracket', workCenterId: 'wc-2', status: 'blocked', startDate: '2026-06-15', endDate: '2026-09-05' },
   },
+  {
+    docId: 'wo-10',
+    docType: 'workOrder',
+    data: { name: 'Fixture Swap', workCenterId: 'wc-2', status: 'open', startDate: '2026-09-22', endDate: '2026-09-27' },
+  },
+  {
+    docId: 'wo-11',
+    docType: 'workOrder',
+    data: { name: 'Month-End Cleanup', workCenterId: 'wc-2', status: 'in-progress', startDate: '2026-09-29', endDate: '2026-10-02' },
+  },
+  {
+    docId: 'wo-12',
+    docType: 'workOrder',
+    data: { name: 'Laser Alignment', workCenterId: 'wc-2', status: 'blocked', startDate: '2026-10-06', endDate: '2026-10-06' },
+  },
 
   // Assembly Station — two non-overlapping orders
   {
@@ -66,6 +82,16 @@ export const WORK_ORDERS: WorkOrderDocument[] = [
     docId: 'wo-8',
     docType: 'workOrder',
     data: { name: 'Final Audit', workCenterId: 'wc-4', status: 'blocked', startDate: '2026-07-06', endDate: '2026-09-26' },
+  },
+  {
+    docId: 'wo-13',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #1', workCenterId: 'wc-4', status: 'complete', startDate: '2026-10-08', endDate: '2026-10-09' },
+  },
+  {
+    docId: 'wo-14',
+    docType: 'workOrder',
+    data: { name: 'Spot Check #2', workCenterId: 'wc-4', status: 'open', startDate: '2026-10-10', endDate: '2026-10-11' },
   },
 
   // Packaging Line — single open order

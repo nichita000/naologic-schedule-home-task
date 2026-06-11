@@ -61,6 +61,26 @@ describe('ScheduleComponent', () => {
     expect(bar?.textContent).toContain('Complete');
   });
 
+  it('renders short month orders as compact markers', () => {
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-1',
+        name: 'Laser Alignment',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-10-06',
+        endDate: '2026-10-06',
+      },
+    ]);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.querySelector('.schedule__compact')).not.toBeNull();
+    expect(host.querySelector('.schedule__compact-dot--blocked')).not.toBeNull();
+    expect(host.querySelector('.schedule__bar')).toBeNull();
+  });
+
   it('previews an add pill on an empty timeline slot', () => {
     component.onRowMove(mockRowMove(114 * 4 + 70), 'wc-1');
     fixture.detectChanges();

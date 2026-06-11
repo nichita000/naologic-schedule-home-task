@@ -63,7 +63,7 @@
               (mousemove)="onRowMove($event, wc.id)"
               (mouseleave)="clearHover()"
             >
-              @for (order of placedByCenter()[wc.id]; track order.id) {
+              @for (order of visibleBarsByCenter()[wc.id]; track order.id) {
                 <div
                   class="schedule__bar"
                   [style.width.px]="order.width - 8"
@@ -76,6 +76,26 @@
                     (delete)="onOrderAction(order, 'delete')"
                   />
                 </div>
+              }
+
+              @for (group of compactGroupsByCenter()[wc.id]; track group.left) {
+                <button
+                  type="button"
+                  class="schedule__compact"
+                  [attr.aria-label]="group.orders.length + ' compact work orders'"
+                  [style.transform]="'translate(' + (group.left + 8) + 'px, -50%)'"
+                >
+                  @for (order of group.orders.slice(0, 2); track order.id) {
+                    <span
+                      class="schedule__compact-dot"
+                      [ngClass]="statusClass(order.status)"
+                    ></span>
+                  }
+
+                  @if (group.orders.length > 2) {
+                    <span class="schedule__compact-count">+{{ group.orders.length - 2 }}</span>
+                  }
+                </button>
               }
 
               @if (hoveredRowId() === wc.id && hoverPlacement(); as placement) {
