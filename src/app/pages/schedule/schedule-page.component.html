@@ -5,5 +5,14 @@
     <h1 class="schedule-page__title">Work Orders</h1>
 
     <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+
+    <div class="schedule-page__schedule">
+      <nao-schedule
+        [workCenters]="workCenters()"
+        [scale]="timescale()"
+        [timelineStartDate]="timelineStartDate"
+        [timelineEndDate]="timelineEndDate"
+      />
+    </div>
   </section>
 </main>

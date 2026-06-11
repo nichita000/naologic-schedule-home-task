@@ -1,0 +1,161 @@
+.schedule {
+  display: flex;
+  min-height: calc(100vh - 204px);
+  background: var(--color-surface);
+  border-top: 1px solid #e6ebf0;
+  border-left: 1px solid #e6ebf0;
+  border-bottom: 1px solid #e6ebf0;
+  overflow: hidden;
+}
+
+// The ruler renders its own top border when used standalone; inside the
+// schedule the frame's border-top covers it, so drop it to avoid doubling.
+.schedule ::ng-deep .nao-schedule-ruler {
+  border-top: none;
+}
+
+.schedule__sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  flex-shrink: 0;
+  border-right: 1px solid #e6ebf0;
+}
+
+.schedule__head {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 30px;
+  border-bottom: 1px solid #e6ebf0;
+  font-size: var(--font-size-md);
+  font-weight: 400;
+  color: var(--color-gray-500);
+}
+
+.schedule__wc {
+  display: flex;
+  align-items: center;
+  height: var(--schedule-row-height);
+  padding: 0 30px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: #fff;
+  font-size: var(--font-size-md);
+  font-weight: 400;
+  color: #030929;
+  transition: background-color var(--transition-fast);
+
+  &:hover,
+  &--hovered {
+    background: #fafbfd;
+  }
+}
+
+.schedule__sidebar-fill { flex: 1; background: #fff; }
+
+.schedule__canvas {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.schedule__timeline-scroll {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-color: rgba(104, 113, 150, 0.42) transparent;
+  scrollbar-width: thin;
+}
+
+.schedule__timeline-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.schedule__timeline-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.schedule__timeline-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid var(--color-surface);
+  border-radius: 999px;
+  background: rgba(104, 113, 150, 0.42);
+}
+
+.schedule__timeline-track {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+}
+
+// ── Current-period marker (pill + vertical line) ─────────────────
+.schedule__current {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.schedule__current-pill {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border-top-left-radius: 0;
+  background: #d6d8ff;
+  color: #3e40db;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+// Vertical "today" line — lives in the grid layer so work-order bars sit on top of it.
+.schedule__current-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #d6d8ff;
+}
+
+.schedule__gantt-space {
+  position: relative;
+  min-height: calc(100% - 34px);
+  background: #f7f9fc;
+}
+
+.schedule__vertical-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.schedule__vertical-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: #e6ebf0;
+}
+
+.schedule__gantt-row {
+  position: relative;
+  height: var(--schedule-row-height);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: #f7f9fc;
+  transition: background-color var(--transition-fast);
+
+  &:hover,
+  &--hovered {
+    background: #eef0ff;
+  }
+}

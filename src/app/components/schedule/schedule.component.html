@@ -1,0 +1,71 @@
+<div class="schedule">
+  <aside class="schedule__sidebar">
+    <div class="schedule__head">Work Center</div>
+    @for (wc of workCenters(); track wc.id) {
+      <div
+        class="schedule__wc"
+        [class.schedule__wc--hovered]="hoveredRowId() === wc.id"
+        (mouseenter)="setHoveredRow(wc.id)"
+        (mouseleave)="setHoveredRow(null)"
+      >
+        {{ wc.name }}
+      </div>
+    }
+    <div class="schedule__sidebar-fill"></div>
+  </aside>
+
+  <div class="schedule__canvas">
+    <div class="schedule__timeline-scroll" #timelineScroll>
+      <div class="schedule__timeline-track" [style.width.px]="timelineWidth()">
+        @if (currentMarker(); as marker) {
+          <div
+            class="schedule__current"
+            [style.transform]="'translateX(' + marker.left + 'px)'"
+          >
+            <span class="schedule__current-pill">{{ marker.label }}</span>
+          </div>
+        }
+
+        <nao-schedule-ruler
+          [scale]="rulerScale()"
+          [startDate]="timelineStartDate()"
+          [endDate]="timelineEndDate()"
+          [scrollable]="false"
+        />
+
+        <div class="schedule__gantt-space" aria-hidden="true">
+          <div class="schedule__vertical-lines">
+            @for (cell of timelineCells(); track cell.key) {
+              @if (cell.left > 0) {
+                <span
+                  class="schedule__vertical-line"
+                  [style.transform]="'translateX(' + cell.left + 'px)'"
+                ></span>
+              }
+            }
+            <span
+              class="schedule__vertical-line"
+              [style.transform]="'translateX(' + timelineWidth() + 'px)'"
+            ></span>
+
+            @if (currentMarker(); as marker) {
+              <span
+                class="schedule__current-line"
+                [style.transform]="'translateX(' + marker.left + 'px)'"
+              ></span>
+            }
+          </div>
+
+          @for (wc of workCenters(); track wc.id) {
+            <div
+              class="schedule__gantt-row"
+              [class.schedule__gantt-row--hovered]="hoveredRowId() === wc.id"
+              (mouseenter)="setHoveredRow(wc.id)"
+              (mouseleave)="setHoveredRow(null)"
+            ></div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
