@@ -14,6 +14,7 @@ import { ScheduleStore } from '../../services/schedule.store';
 export class SchedulePageComponent {
   readonly timescale = signal<Timescale>(Timescale.Day);
   readonly workCenters = this.scheduleStore.workCenters;
+  readonly workOrders = this.scheduleStore.workOrders;
   readonly timelineStartDate = `${new Date().getFullYear() - 2}-01-01`;
   readonly timelineEndDate = `${new Date().getFullYear() + 2}-12-31`;
 

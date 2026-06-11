@@ -159,3 +159,12 @@
     background: #eef0ff;
   }
 }
+
+.schedule__bar {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 2;
+  min-width: 0;
+  transform: translateY(-50%);
+}

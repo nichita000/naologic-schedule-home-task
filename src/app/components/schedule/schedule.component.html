@@ -62,7 +62,20 @@
               [class.schedule__gantt-row--hovered]="hoveredRowId() === wc.id"
               (mouseenter)="setHoveredRow(wc.id)"
               (mouseleave)="setHoveredRow(null)"
-            ></div>
+            >
+              @for (order of placedByCenter()[wc.id]; track order.id) {
+                <div
+                  class="schedule__bar"
+                  [style.width.px]="order.width - 8"
+                  [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
+                >
+                  <nao-work-order
+                    [name]="order.name"
+                    [status]="order.status"
+                  />
+                </div>
+              }
+            </div>
           }
         </div>
       </div>

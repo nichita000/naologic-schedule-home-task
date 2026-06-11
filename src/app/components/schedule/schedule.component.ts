@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import {
   buildRulerCells,
   findCurrentCellLeft,
+  placeBar,
   ScheduleRulerComponent,
   ScheduleRulerScale,
 } from '../schedule-ruler/schedule-ruler.component';
 import { Timescale } from '../timescale/timescale.component';
 import { BadgeStatus } from '../badge/badge.component';
+import { WorkOrderComponent } from '../work-order/work-order.component';
 
 export interface WorkCenter {
   id: string;
@@ -23,10 +25,15 @@ export interface ScheduleOrder {
   endDate: string;
 }
 
+export interface PlacedOrder extends ScheduleOrder {
+  left: number;
+  width: number;
+}
+
 @Component({
   selector: 'nao-schedule',
   standalone: true,
-  imports: [CommonModule, ScheduleRulerComponent],
+  imports: [CommonModule, ScheduleRulerComponent, WorkOrderComponent],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,6 +42,7 @@ export class ScheduleComponent implements AfterViewInit {
   @ViewChild('timelineScroll') private readonly timelineScroll?: ElementRef<HTMLElement>;
 
   readonly workCenters = input<WorkCenter[]>([]);
+  readonly workOrders = input<ScheduleOrder[]>([]);
   readonly scale = input<Timescale>(Timescale.Month);
   readonly timelineStartDate = input.required<string>();
   readonly timelineEndDate = input.required<string>();
@@ -55,6 +63,23 @@ export class ScheduleComponent implements AfterViewInit {
   readonly timelineWidth = computed(() =>
     this.timelineCells().reduce((sum, cell) => sum + cell.width, 0)
   );
+
+  readonly placedByCenter = computed<Record<string, PlacedOrder[]>>(() => {
+    const scale = this.rulerScale();
+    const start = this.timelineStartDate();
+    const map: Record<string, PlacedOrder[]> = {};
+
+    for (const center of this.workCenters()) {
+      map[center.id] = [];
+    }
+
+    for (const order of this.workOrders()) {
+      const { left, width } = placeBar(scale, start, order.startDate, order.endDate);
+      (map[order.workCenterId] ??= []).push({ ...order, left, width });
+    }
+
+    return map;
+  });
 
   readonly currentMarker = computed<{ left: number; label: string } | null>(() => {
     const left = findCurrentCellLeft(

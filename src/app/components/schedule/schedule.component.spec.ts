@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BadgeStatus } from '../badge/badge.component';
 import { Timescale } from '../timescale/timescale.component';
 import { ScheduleComponent } from './schedule.component';
 
@@ -35,5 +36,26 @@ describe('ScheduleComponent', () => {
 
     expect(host.querySelector('.schedule__current-pill')?.textContent).toContain('Current month');
     expect(host.querySelector('.schedule__current-line')).not.toBeNull();
+  });
+
+  it('renders work order bars on the matching work-center row', () => {
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-1',
+        name: 'Casing Extrusion',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Complete,
+        startDate: '2026-05-01',
+        endDate: '2026-06-18',
+      },
+    ]);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const bar = host.querySelector<HTMLElement>('.schedule__bar');
+
+    expect(bar).not.toBeNull();
+    expect(bar?.textContent).toContain('Casing Extrusion');
+    expect(bar?.textContent).toContain('Complete');
   });
 });
