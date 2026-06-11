@@ -13,7 +13,20 @@
         [scale]="timescale()"
         [timelineStartDate]="timelineStartDate"
         [timelineEndDate]="timelineEndDate"
+        (addWorkOrder)="openCreate($event)"
+        (orderAction)="handleOrderAction($event)"
       />
     </div>
   </section>
 </main>
+
+@if (drawerOpen()) {
+  <nao-work-order-drawer
+    [mode]="drawerMode()"
+    [value]="drawerValue()"
+    [workCenters]="workCenters()"
+    [existingOrders]="workOrders()"
+    (closed)="closeDrawer()"
+    (saved)="saveDrawer($event)"
+  />
+}

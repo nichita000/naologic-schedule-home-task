@@ -40,6 +40,8 @@ export interface AddWorkOrderRequest {
   endDate: string;
 }
 
+export type WorkOrderAction = 'edit' | 'delete';
+
 interface HoverPlacement {
   left: number;
   width: number;
@@ -66,6 +68,7 @@ export class ScheduleComponent implements AfterViewInit {
   readonly currentDate = input<string | null>(null);
 
   readonly addWorkOrder = output<AddWorkOrderRequest>();
+  readonly orderAction = output<{ order: ScheduleOrder; action: WorkOrderAction }>();
 
   readonly hoveredRowId = signal<string | null>(null);
   readonly hoverPlacement = signal<HoverPlacement | null>(null);
@@ -182,6 +185,10 @@ export class ScheduleComponent implements AfterViewInit {
     }
 
     this.addWorkOrder.emit({ workCenterId, ...placement });
+  }
+
+  onOrderAction(order: ScheduleOrder, action: WorkOrderAction): void {
+    this.orderAction.emit({ order, action });
   }
 
   private today(): Date {

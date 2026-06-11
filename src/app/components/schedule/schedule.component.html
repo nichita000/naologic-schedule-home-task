@@ -72,6 +72,8 @@
                   <nao-work-order
                     [name]="order.name"
                     [status]="order.status"
+                    (edit)="onOrderAction(order, 'edit')"
+                    (delete)="onOrderAction(order, 'delete')"
                   />
                 </div>
               }
