@@ -82,8 +82,11 @@
                 <button
                   type="button"
                   class="schedule__compact"
+                  [class.schedule__compact--active]="isCompactGroupOpen(wc.id, group.left)"
                   [attr.aria-label]="group.orders.length + ' compact work orders'"
+                  [attr.aria-expanded]="isCompactGroupOpen(wc.id, group.left)"
                   [style.transform]="'translate(' + (group.left + 8) + 'px, -50%)'"
+                  (click)="toggleCompactGroup(wc.id, group.left); $event.stopPropagation()"
                 >
                   @for (order of group.orders.slice(0, 2); track order.id) {
                     <span
@@ -96,9 +99,45 @@
                     <span class="schedule__compact-count">+{{ group.orders.length - 2 }}</span>
                   }
                 </button>
+
+                @if (isCompactGroupOpen(wc.id, group.left)) {
+                  <div
+                    class="schedule__compact-popover"
+                    [style.transform]="'translate(' + (group.left + 8) + 'px, 28px)'"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <header class="schedule__compact-popover-head">
+                      <strong>Work orders</strong>
+                      <span>{{ compactGroupRange(group) }}</span>
+                      <small>{{ group.orders.length }} total</small>
+                    </header>
+
+                    <div class="schedule__compact-popover-list">
+                      @for (order of group.orders; track order.id) {
+                        <article class="schedule__compact-popover-item">
+                          <div class="schedule__compact-popover-bar">
+                            <nao-work-order
+                              hideMenu
+                              [name]="order.name"
+                              [status]="order.status"
+                            />
+                          </div>
+                          <span class="schedule__compact-popover-date">{{ orderDateRange(order) }}</span>
+                          <button
+                            type="button"
+                            class="schedule__compact-popover-action"
+                            aria-label="Open compact work order"
+                          >
+                            →
+                          </button>
+                        </article>
+                      }
+                    </div>
+                  </div>
+                }
               }
 
-              @if (hoveredRowId() === wc.id && hoverPlacement(); as placement) {
+              @if (!activeCompactGroup() && hoveredRowId() === wc.id && hoverPlacement(); as placement) {
                 @for (slot of [placement]; track slot.left + '-' + slot.width) {
                   <button
                     type="button"

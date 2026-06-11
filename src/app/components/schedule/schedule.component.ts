@@ -13,6 +13,7 @@ import { Timescale } from '../timescale/timescale.component';
 import { BadgeStatus } from '../badge/badge.component';
 import { TooltipDirective } from '../tooltip/tooltip.directive';
 import { WorkOrderComponent } from '../work-order/work-order.component';
+import { formatDateRange } from '../../utils/format-date-range';
 
 export interface WorkCenter {
   id: string;
@@ -36,6 +37,11 @@ export interface PlacedOrder extends ScheduleOrder {
 interface CompactOrderGroup {
   left: number;
   orders: PlacedOrder[];
+}
+
+interface ActiveCompactGroup {
+  workCenterId: string;
+  left: number;
 }
 
 export interface AddWorkOrderRequest {
@@ -78,6 +84,7 @@ export class ScheduleComponent implements AfterViewInit {
 
   readonly hoveredRowId = signal<string | null>(null);
   readonly hoverPlacement = signal<HoverPlacement | null>(null);
+  readonly activeCompactGroup = signal<ActiveCompactGroup | null>(null);
   private readonly viewReady = signal(false);
 
   readonly rulerScale = computed<ScheduleRulerScale>(() => {
@@ -211,6 +218,11 @@ export class ScheduleComponent implements AfterViewInit {
     const x = event.clientX - rect.left;
     this.hoveredRowId.set(id);
 
+    if (this.activeCompactGroup()) {
+      this.hoverPlacement.set(null);
+      return;
+    }
+
     const orders = this.placedByCenter()[id] ?? [];
     if (orders.some(order => x >= order.left && x < order.left + order.width)) {
       this.hoverPlacement.set(null);
@@ -223,6 +235,23 @@ export class ScheduleComponent implements AfterViewInit {
   clearHover(): void {
     this.hoveredRowId.set(null);
     this.hoverPlacement.set(null);
+  }
+
+  toggleCompactGroup(workCenterId: string, left: number): void {
+    const active = this.activeCompactGroup();
+
+    if (active?.workCenterId === workCenterId && active.left === left) {
+      this.activeCompactGroup.set(null);
+      return;
+    }
+
+    this.hoverPlacement.set(null);
+    this.activeCompactGroup.set({ workCenterId, left });
+  }
+
+  isCompactGroupOpen(workCenterId: string, left: number): boolean {
+    const active = this.activeCompactGroup();
+    return active?.workCenterId === workCenterId && active.left === left;
   }
 
   onAddWorkOrder(workCenterId: string): void {
@@ -241,6 +270,15 @@ export class ScheduleComponent implements AfterViewInit {
 
   statusClass(status: BadgeStatus): string {
     return `schedule__compact-dot--${status}`;
+  }
+
+  compactGroupRange(group: CompactOrderGroup): string {
+    const dates = group.orders.flatMap(order => [order.startDate, order.endDate]).sort();
+    return formatDateRange(dates[0], dates[dates.length - 1]);
+  }
+
+  orderDateRange(order: ScheduleOrder): string {
+    return formatDateRange(order.startDate, order.endDate);
   }
 
   private today(): Date {
