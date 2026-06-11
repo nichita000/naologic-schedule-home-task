@@ -1,0 +1,20 @@
+<div class="nao-schedule-ruler" role="region" aria-label="Schedule timeline">
+  <div
+    #scrollport
+    class="nao-schedule-ruler__scroll"
+    [class.nao-schedule-ruler__scroll--standalone]="scrollable()"
+    (scroll)="onScroll($event)"
+  >
+    <div class="nao-schedule-ruler__spacer" [style.width.px]="totalWidth()">
+      @for (cell of visibleCells(); track cell.key) {
+        <div
+          class="nao-schedule-ruler__cell"
+          [style.width.px]="cell.width"
+          [style.transform]="'translateX(' + cell.left + 'px)'"
+        >
+          {{ cell.label }}
+        </div>
+      }
+    </div>
+  </div>
+</div>

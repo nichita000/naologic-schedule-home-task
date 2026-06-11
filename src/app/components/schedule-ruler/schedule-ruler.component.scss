@@ -1,0 +1,56 @@
+.nao-schedule-ruler {
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-top: 1px solid #e6ebf0;
+  border-bottom: 1px solid #e6ebf0;
+
+  &__scroll {
+    overflow-x: hidden;
+    overflow-y: hidden;
+    width: 100%;
+
+    &--standalone {
+      overflow-x: auto;
+      scrollbar-color: rgba(104, 113, 150, 0.42) transparent;
+      scrollbar-width: thin;
+    }
+  }
+
+  &__scroll--standalone::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  &__scroll--standalone::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &__scroll--standalone::-webkit-scrollbar-thumb {
+    border: 3px solid var(--color-surface);
+    border-radius: 999px;
+    background: rgba(104, 113, 150, 0.42);
+  }
+
+  &__spacer {
+    position: relative;
+    height: 33px;
+    min-width: 100%;
+  }
+
+  &__cell {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 33px;
+    color: #687196;
+    font-family: var(--font-family);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 16px;
+    white-space: nowrap;
+    will-change: transform;
+  }
+}
