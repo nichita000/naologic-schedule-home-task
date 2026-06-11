@@ -1,0 +1,17 @@
+<div class="nao-wo" [ngClass]="'nao-wo--' + status()">
+  <span class="nao-wo__name" [naoTooltip]="name()" naoTooltipPosition="top-left">{{ name() }}</span>
+  <span class="nao-wo__status">{{ statusLabel }}</span>
+  @if (!hideMenu()) {
+    <nao-dropdown
+      class="nao-wo__menu"
+      [options]="menuOptions"
+      (selectedChange)="onAction($event)"
+    >
+      <nao-icon-button
+        naoDropdownTrigger
+        [variant]="IconButtonVariant.Subtle"
+        label="Work order options"
+      />
+    </nao-dropdown>
+  }
+</div>
