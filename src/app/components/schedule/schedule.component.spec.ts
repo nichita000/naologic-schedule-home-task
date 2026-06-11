@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { BadgeStatus } from '../badge/badge.component';
 import { Timescale } from '../timescale/timescale.component';
 import { ScheduleComponent } from './schedule.component';
@@ -196,6 +196,50 @@ describe('ScheduleComponent', () => {
 
     expect(emitted).toEqual(['wc-1:2026-09-01:2026-09-30']);
   });
+
+  it('emits the currently highlighted add-date range', () => {
+    const emitted: Array<{ startDate: string; endDate: string } | null> = [];
+    fixture.componentInstance.addPreviewRangeChange.subscribe(range => emitted.push(range));
+
+    component.onRowMove(mockRowMove(114 * 4 + 70), 'wc-1');
+    component.clearHover();
+
+    expect(emitted).toEqual([
+      { startDate: '2026-09-01', endDate: '2026-09-30' },
+      null,
+    ]);
+  });
+
+  it('replays the focus pulse after focus scrolling settles', fakeAsync(() => {
+    fixture.componentRef.setInput('scale', Timescale.Day);
+    fixture.componentRef.setInput('timelineStartDate', '2026-06-16');
+    fixture.componentRef.setInput('timelineEndDate', '2026-06-30');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-focus',
+        name: 'Focused Run',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-06-20',
+        endDate: '2026-06-20',
+      },
+    ]);
+    fixture.componentRef.setInput('focusDate', '2026-06-20');
+    fixture.componentRef.setInput('focusedOrderId', 'wo-focus');
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const bar = host.querySelector<HTMLElement>('.schedule__bar');
+
+    expect(bar?.classList.contains('schedule__bar--focused')).toBeFalse();
+
+    tick(120);
+    fixture.detectChanges();
+
+    expect(bar?.classList.contains('schedule__bar--focused')).toBeTrue();
+  }));
 
   function mockRowMove(x: number): MouseEvent {
     return {

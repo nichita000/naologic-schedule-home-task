@@ -66,7 +66,7 @@
               @for (order of visibleBarsByCenter()[wc.id]; track order.id) {
                 <div
                   class="schedule__bar"
-                  [class.schedule__bar--focused]="focusedOrderId() === order.id"
+                  [class.schedule__bar--focused]="visibleFocusedOrderId() === order.id"
                   [style.width.px]="order.width - 8"
                   [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
                 >

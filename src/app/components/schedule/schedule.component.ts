@@ -1,7 +1,8 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, input, output, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild, computed, effect, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   buildRulerCells,
+  dateToOffset,
   findCurrentCellLeft,
   offsetRangeToDateRange,
   placeBar,
@@ -69,7 +70,7 @@ interface HoverPlacement {
   styleUrl: './schedule.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ScheduleComponent implements AfterViewInit {
+export class ScheduleComponent implements AfterViewInit, OnDestroy {
   @ViewChild('timelineScroll') private readonly timelineScroll?: ElementRef<HTMLElement>;
 
   readonly workCenters = input<WorkCenter[]>([]);
@@ -79,16 +80,21 @@ export class ScheduleComponent implements AfterViewInit {
   readonly timelineEndDate = input.required<string>();
   readonly currentDate = input<string | null>(null);
   readonly focusDate = input<string | null>(null);
+  readonly focusRequestId = input<number>(0);
   readonly focusedOrderId = input<string | null>(null);
 
   readonly addWorkOrder = output<AddWorkOrderRequest>();
+  readonly addPreviewRangeChange = output<{ startDate: string; endDate: string } | null>();
   readonly orderAction = output<{ order: ScheduleOrder; action: WorkOrderAction }>();
   readonly compactOrderFocus = output<ScheduleOrder>();
 
   readonly hoveredRowId = signal<string | null>(null);
   readonly hoverPlacement = signal<HoverPlacement | null>(null);
   readonly activeCompactGroup = signal<ActiveCompactGroup | null>(null);
+  readonly visibleFocusedOrderId = signal<string | null>(null);
   private readonly viewReady = signal(false);
+  private focusSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private cleanupFocusScroll: (() => void) | null = null;
 
   readonly rulerScale = computed<ScheduleRulerScale>(() => {
     const scale = this.scale();
@@ -200,6 +206,8 @@ export class ScheduleComponent implements AfterViewInit {
       this.timelineEndDate();
       this.currentDate();
       this.focusDate();
+      this.focusRequestId();
+      this.focusedOrderId();
       this.timelineWidth();
 
       if (!this.viewReady()) {
@@ -220,6 +228,10 @@ export class ScheduleComponent implements AfterViewInit {
     this.viewReady.set(true);
   }
 
+  ngOnDestroy(): void {
+    this.cancelPendingFocusAnimation();
+  }
+
   setHoveredRow(id: string | null): void {
     this.hoveredRowId.set(id);
   }
@@ -230,22 +242,22 @@ export class ScheduleComponent implements AfterViewInit {
     this.hoveredRowId.set(id);
 
     if (this.activeCompactGroup()) {
-      this.hoverPlacement.set(null);
+      this.setHoverPlacement(null);
       return;
     }
 
     const orders = this.placedByCenter()[id] ?? [];
     if (orders.some(order => x >= order.left && x < order.left + order.width)) {
-      this.hoverPlacement.set(null);
+      this.setHoverPlacement(null);
       return;
     }
 
-    this.hoverPlacement.set(this.findAvailablePlacement(x, orders));
+    this.setHoverPlacement(this.findAvailablePlacement(x, orders));
   }
 
   clearHover(): void {
     this.hoveredRowId.set(null);
-    this.hoverPlacement.set(null);
+    this.setHoverPlacement(null);
   }
 
   toggleCompactGroup(workCenterId: string, left: number): void {
@@ -256,7 +268,7 @@ export class ScheduleComponent implements AfterViewInit {
       return;
     }
 
-    this.hoverPlacement.set(null);
+    this.setHoverPlacement(null);
     this.activeCompactGroup.set({ workCenterId, left });
   }
 
@@ -282,6 +294,13 @@ export class ScheduleComponent implements AfterViewInit {
   onCompactOrderFocus(order: ScheduleOrder): void {
     this.activeCompactGroup.set(null);
     this.compactOrderFocus.emit(order);
+  }
+
+  private setHoverPlacement(placement: HoverPlacement | null): void {
+    this.hoverPlacement.set(placement);
+    this.addPreviewRangeChange.emit(
+      placement ? { startDate: placement.startDate, endDate: placement.endDate } : null,
+    );
   }
 
   statusClass(status: BadgeStatus): string {
@@ -328,13 +347,56 @@ export class ScheduleComponent implements AfterViewInit {
   private scrollToFocusDate(): void {
     const element = this.timelineScroll?.nativeElement;
     const focusDate = this.focusDate();
+    const focusedOrderId = this.focusedOrderId();
 
     if (!element || !focusDate) {
       return;
     }
 
-    const { left } = placeBar(this.rulerScale(), this.timelineStartDate(), focusDate, focusDate);
-    element.scrollLeft = Math.max(left - this.cellWidth(), 0);
+    this.visibleFocusedOrderId.set(null);
+    this.cancelPendingFocusAnimation();
+
+    const left = dateToOffset(this.rulerScale(), this.timelineStartDate(), focusDate);
+    element.scrollTo({
+      left: Math.max(left - this.cellWidth(), 0),
+      behavior: 'smooth',
+    });
+
+    if (focusedOrderId) {
+      this.runAfterScrollSettles(element, () => {
+        this.visibleFocusedOrderId.set(focusedOrderId);
+      });
+    }
+  }
+
+  private runAfterScrollSettles(element: HTMLElement, callback: () => void): void {
+    const finish = () => {
+      this.cancelPendingFocusAnimation();
+      callback();
+    };
+
+    const scheduleFinish = () => {
+      if (this.focusSettleTimer) {
+        clearTimeout(this.focusSettleTimer);
+      }
+      this.focusSettleTimer = setTimeout(finish, 120);
+    };
+
+    element.addEventListener('scroll', scheduleFinish, { passive: true });
+    this.cleanupFocusScroll = () => element.removeEventListener('scroll', scheduleFinish);
+
+    // If the target is already visible and no scroll event fires, still replay
+    // the focus pulse after a short beat.
+    scheduleFinish();
+  }
+
+  private cancelPendingFocusAnimation(): void {
+    if (this.focusSettleTimer) {
+      clearTimeout(this.focusSettleTimer);
+      this.focusSettleTimer = null;
+    }
+    this.cleanupFocusScroll?.();
+    this.cleanupFocusScroll = null;
   }
 
   private cellWidth(): number {

@@ -4,7 +4,29 @@
   <section class="schedule-page__content">
     <h1 class="schedule-page__title">Work Orders</h1>
 
-    <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+    <div class="schedule-page__toolbar">
+      <div class="schedule-page__toolbar-controls">
+        <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+        <button class="schedule-page__today" type="button" (click)="focusToday()">
+          Today
+        </button>
+      </div>
+
+      <span
+        class="schedule-page__preview-range"
+        [class.schedule-page__preview-range--visible]="addPreviewRange()"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        @if (addPreviewRange()) {
+          @for (_ of [addPreviewRangeKey()]; track _) {
+            <span class="schedule-page__preview-range-text">
+              {{ formatAddPreviewRange() }}
+            </span>
+          }
+        }
+      </span>
+    </div>
 
     <div class="schedule-page__schedule">
       <nao-schedule
@@ -14,8 +36,10 @@
         [timelineStartDate]="timelineStartDate"
         [timelineEndDate]="timelineEndDate"
         [focusDate]="focusDate()"
+        [focusRequestId]="focusRequestId()"
         [focusedOrderId]="focusedOrderId()"
         (addWorkOrder)="openCreate($event)"
+        (addPreviewRangeChange)="setAddPreviewRange($event)"
         (orderAction)="handleOrderAction($event)"
         (compactOrderFocus)="focusCompactOrder($event)"
       />

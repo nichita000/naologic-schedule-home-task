@@ -14,6 +14,7 @@ import {
 } from '../../components/work-order-drawer/work-order-drawer.component';
 import { WorkOrderDeleteDialogComponent } from '../../components/work-order-delete-dialog/work-order-delete-dialog.component';
 import { ScheduleStore } from '../../services/schedule.store';
+import { formatDateRange } from '../../utils/format-date-range';
 
 @Component({
   selector: 'app-schedule-page',
@@ -33,7 +34,10 @@ export class SchedulePageComponent {
   /** Order awaiting delete confirmation; the dialog is open while non-null. */
   readonly deleteTarget = signal<ScheduleOrder | null>(null);
   readonly focusDate = signal<string | null>(null);
+  readonly focusRequestId = signal(0);
   readonly focusedOrderId = signal<string | null>(null);
+  readonly addPreviewRange = signal<{ startDate: string; endDate: string } | null>(null);
+  readonly addPreviewRangeKey = signal(0);
   readonly workCenters = this.scheduleStore.workCenters;
   readonly workOrders = this.scheduleStore.workOrders;
   readonly timelineStartDate = `${new Date().getFullYear() - 2}-01-01`;
@@ -51,6 +55,29 @@ export class SchedulePageComponent {
     this.timescale.set(duration <= 3 ? Timescale.Day : Timescale.Week);
     this.focusDate.set(order.startDate);
     this.focusedOrderId.set(order.id);
+    this.focusRequestId.update(value => value + 1);
+  }
+
+  focusToday(): void {
+    this.focusDate.set(this.toIsoDate(new Date()));
+    this.focusedOrderId.set(null);
+    this.focusRequestId.update(value => value + 1);
+  }
+
+  setAddPreviewRange(range: { startDate: string; endDate: string } | null): void {
+    const current = this.addPreviewRange();
+    const nextKey = range ? `${range.startDate}-${range.endDate}` : null;
+    const currentKey = current ? `${current.startDate}-${current.endDate}` : null;
+    this.addPreviewRange.set(range);
+
+    if (nextKey && nextKey !== currentKey) {
+      this.addPreviewRangeKey.update(value => value + 1);
+    }
+  }
+
+  formatAddPreviewRange(): string {
+    const range = this.addPreviewRange();
+    return range ? formatDateRange(range.startDate, range.endDate) : '';
   }
 
   openCreate(request: AddWorkOrderRequest): void {
