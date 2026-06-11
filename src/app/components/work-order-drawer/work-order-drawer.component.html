@@ -1,0 +1,134 @@
+<div class="drawer" role="presentation" (click)="closed.emit()">
+  <aside
+    class="drawer__panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="title"
+    (click)="$event.stopPropagation()"
+  >
+    <form class="drawer__form" [formGroup]="form" (ngSubmit)="save()">
+      <header class="drawer__header">
+        <div>
+          <h2 class="drawer__title">{{ title }}</h2>
+          <p class="drawer__description">Specify the dates, name and status for this order</p>
+        </div>
+
+        <div class="drawer__actions">
+          <nao-button
+            [variant]="ButtonVariant.Secondary"
+            type="button"
+            (clicked)="closed.emit()"
+          >
+            Cancel
+          </nao-button>
+          <nao-button type="submit" [disabled]="isInvalid">
+            {{ submitLabel }}
+          </nao-button>
+        </div>
+      </header>
+
+      <div class="drawer__body">
+        <label class="drawer__field">
+          <span class="drawer__label">
+            Order Name
+            <span class="drawer__hint">{{ draftSignal().name.length }}/{{ nameMaxLength }}</span>
+          </span>
+          <input
+            class="drawer__control"
+            [class.drawer__control--invalid]="nameTooLong()"
+            formControlName="name"
+            placeholder="Work Order Name"
+            autocomplete="off"
+            [maxlength]="nameMaxLength"
+          />
+          @if (nameTooLong()) {
+            <p class="drawer__error">Name must be {{ nameMaxLength }} characters or fewer.</p>
+          }
+        </label>
+
+        <div class="drawer__field">
+          <span class="drawer__label">Status</span>
+          <ng-select
+            class="drawer__status-select"
+            formControlName="status"
+            [items]="statuses"
+            bindLabel="label"
+            bindValue="value"
+            [clearable]="false"
+            [searchable]="false"
+            dropdownPosition="bottom"
+            appendTo="body"
+          >
+            <ng-template ng-label-tmp let-item="item">
+              <nao-badge [status]="item.value" [label]="item.label" />
+            </ng-template>
+            <ng-template ng-option-tmp let-item="item">
+              {{ item.label }}
+            </ng-template>
+          </ng-select>
+        </div>
+
+        <div class="drawer__field">
+          <span class="drawer__label">Start Date</span>
+          <input
+            class="drawer__control drawer__control--date"
+            [class.drawer__control--invalid]="overlaps().length > 0"
+            formControlName="startDate"
+            placeholder="Start date"
+            ngbDatepicker
+            #startPicker="ngbDatepicker"
+            readonly
+            container="body"
+            placement="bottom-start"
+            datepickerClass="nao-datepicker"
+            autoClose="outside"
+            [popperOptions]="datepickerPopperOptions"
+            [maxDate]="startMaxDate()"
+            (click)="openPicker(startPicker)"
+            (dateSelect)="closePickerAfterSelect()"
+          />
+        </div>
+
+        <div class="drawer__field">
+          <span class="drawer__label">End Date</span>
+          <input
+            class="drawer__control drawer__control--date"
+            [class.drawer__control--invalid]="overlaps().length > 0"
+            formControlName="endDate"
+            placeholder="End date"
+            ngbDatepicker
+            #endPicker="ngbDatepicker"
+            readonly
+            container="body"
+            placement="bottom-start"
+            datepickerClass="nao-datepicker"
+            autoClose="outside"
+            [popperOptions]="datepickerPopperOptions"
+            [minDate]="endMinDate()"
+            (click)="openPicker(endPicker)"
+            (dateSelect)="closePickerAfterSelect()"
+          />
+        </div>
+
+        @if (overlaps().length > 0) {
+          <div class="drawer__overlap">
+            <p class="drawer__error">
+              This range overlaps with the work order{{ overlaps().length > 1 ? 's' : '' }} below.
+              Adjust the dates or pick another work centre.
+            </p>
+            @for (conflict of overlaps(); track conflict.id) {
+              <div class="drawer__overlap-row">
+                <div class="drawer__overlap-bar">
+                  <nao-work-order hideMenu [name]="conflict.name" [status]="conflict.status" />
+                </div>
+                <span class="drawer__overlap-date">
+                  {{ formatRange(conflict.startDate, conflict.endDate) }}
+                </span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </form>
+  </aside>
+</div>
