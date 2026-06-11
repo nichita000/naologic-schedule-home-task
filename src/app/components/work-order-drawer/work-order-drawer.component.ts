@@ -9,6 +9,7 @@ import { BadgeComponent, BadgeStatus } from '../badge/badge.component';
 import { ButtonComponent, ButtonVariant } from '../button/button.component';
 import { ScheduleOrder, WorkCenter } from '../schedule/schedule.component';
 import { WorkOrderComponent } from '../work-order/work-order.component';
+import { formatDateRange } from '../../utils/format-date-range';
 
 /** Max characters allowed in a work-order name (UI + validation). */
 export const WORK_ORDER_NAME_MAX_LENGTH = 60;
@@ -145,13 +146,9 @@ export class WorkOrderDrawerComponent implements OnChanges, OnInit, OnDestroy, A
     return !!(d.startDate && d.endDate && d.endDate < d.startDate);
   });
 
-  /** Human-readable date range like "May 1 – Jun 19, 2026". */
+  /** Human-readable date range like "May 1, 2026 – Jun 19, 2026". */
   protected formatRange(start: string, end: string): string {
-    const fmt = (iso: string) => {
-      const [y, m, day] = iso.split('-').map(Number);
-      return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
-    return `${fmt(start)} – ${fmt(end)}`;
+    return formatDateRange(start, end);
   }
 
   // ── Datepicker header injection ──────────────────────────────────

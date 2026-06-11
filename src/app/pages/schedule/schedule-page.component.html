@@ -20,6 +20,14 @@
   </section>
 </main>
 
+@if (deleteTarget(); as order) {
+  <nao-work-order-delete-dialog
+    [order]="order"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()"
+  />
+}
+
 @if (drawerOpen()) {
   <nao-work-order-drawer
     [mode]="drawerMode()"

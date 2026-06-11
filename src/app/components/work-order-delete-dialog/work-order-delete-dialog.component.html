@@ -1,0 +1,28 @@
+<div class="delete-dialog" role="presentation" (click)="cancelled.emit()">
+  <div
+    class="delete-dialog__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Delete work order"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="delete-dialog__title">Delete Work Order</h2>
+    <p class="delete-dialog__description">
+      This will permanently remove the work order below from the schedule.
+    </p>
+
+    <div class="delete-dialog__preview">
+      <div class="delete-dialog__preview-bar">
+        <nao-work-order hideMenu [name]="order().name" [status]="order().status" />
+      </div>
+      <span class="delete-dialog__preview-date">{{ scheduledRange }}</span>
+    </div>
+
+    <footer class="delete-dialog__actions">
+      <nao-button [variant]="ButtonVariant.Secondary" (clicked)="cancelled.emit()">
+        Cancel
+      </nao-button>
+      <nao-button (clicked)="confirmed.emit()">Delete</nao-button>
+    </footer>
+  </div>
+</div>

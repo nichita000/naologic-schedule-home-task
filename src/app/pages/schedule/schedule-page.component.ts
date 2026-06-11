@@ -12,13 +12,14 @@ import {
   WorkOrderDrawerMode,
   WorkOrderDrawerValue,
 } from '../../components/work-order-drawer/work-order-drawer.component';
+import { WorkOrderDeleteDialogComponent } from '../../components/work-order-delete-dialog/work-order-delete-dialog.component';
 import { ScheduleStore } from '../../services/schedule.store';
 
 @Component({
   selector: 'app-schedule-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ScheduleComponent, TimescaleComponent, WorkOrderDrawerComponent],
+  imports: [ScheduleComponent, TimescaleComponent, WorkOrderDrawerComponent, WorkOrderDeleteDialogComponent],
   templateUrl: './schedule-page.component.html',
   styleUrl: './schedule-page.component.scss',
 })
@@ -29,6 +30,8 @@ export class SchedulePageComponent {
   readonly drawerMode = signal<WorkOrderDrawerMode>('create');
   readonly drawerValue = signal<WorkOrderDrawerValue | null>(null);
   readonly drawerOpen = signal(false);
+  /** Order awaiting delete confirmation; the dialog is open while non-null. */
+  readonly deleteTarget = signal<ScheduleOrder | null>(null);
   readonly workCenters = this.scheduleStore.workCenters;
   readonly workOrders = this.scheduleStore.workOrders;
   readonly timelineStartDate = `${new Date().getFullYear() - 2}-01-01`;
@@ -55,13 +58,25 @@ export class SchedulePageComponent {
 
   handleOrderAction(event: { order: ScheduleOrder; action: WorkOrderAction }): void {
     if (event.action === 'delete') {
-      this.scheduleStore.deleteWorkOrder(event.order.id);
+      this.deleteTarget.set(event.order);
       return;
     }
 
     this.drawerMode.set('edit');
     this.drawerValue.set({ ...event.order });
     this.drawerOpen.set(true);
+  }
+
+  confirmDelete(): void {
+    const target = this.deleteTarget();
+    if (target) {
+      this.scheduleStore.deleteWorkOrder(target.id);
+    }
+    this.deleteTarget.set(null);
+  }
+
+  cancelDelete(): void {
+    this.deleteTarget.set(null);
   }
 
   closeDrawer(): void {
