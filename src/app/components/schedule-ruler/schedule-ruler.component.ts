@@ -121,17 +121,28 @@ export function findCurrentCellLeft(
     return null;
   }
 
-  const DAY_MS = 86_400_000;
-
   switch (scale) {
     case Timescale.Day:
-      return Math.round((now.getTime() - start.getTime()) / DAY_MS) * 64;
+      return daysBetween(start, now) * 64;
     case Timescale.Week:
-      return Math.round((startOfWeek(now).getTime() - startOfWeek(start).getTime()) / (7 * DAY_MS)) * 150;
+      return (daysBetween(startOfWeek(start), startOfWeek(now)) / 7) * 150;
     case Timescale.Month:
     default:
       return ((now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth()) * 114;
   }
+}
+
+/**
+ * Calendar-day difference between two local dates. Raw `getTime()` deltas
+ * drift by ±1h across DST transitions, which makes `floor(diff / DAY_MS)`
+ * lose a whole day (e.g. winter start → summer date); normalising through
+ * UTC removes the offset entirely.
+ */
+function daysBetween(start: Date, end: Date): number {
+  const DAY_MS = 86_400_000;
+  const utcStart = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const utcEnd = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.round((utcEnd - utcStart) / DAY_MS);
 }
 
 /** ISO date one slot before the period containing `current` (for the timeline start). */
@@ -185,14 +196,13 @@ export function snapPreviewLeft(scale: ScheduleRulerScale, left: number): number
 export function dateToOffset(scale: ScheduleRulerScale, startDate: string, dateIso: string): number {
   const start = startOfDay(parseDate(startDate));
   const date = startOfDay(parseDate(dateIso));
-  const DAY_MS = 86_400_000;
 
   switch (scale) {
     case Timescale.Day:
-      return Math.floor((date.getTime() - start.getTime()) / DAY_MS) * 64;
+      return daysBetween(start, date) * 64;
 
     case Timescale.Week:
-      return Math.floor((date.getTime() - startOfWeek(start).getTime()) / (7 * DAY_MS)) * 150;
+      return Math.floor(daysBetween(startOfWeek(start), date) / 7) * 150;
 
     case Timescale.Month:
     default: {

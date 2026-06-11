@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, ChangeDetectionStrategy, Component, OnChanges, OnDestroy, OnInit, ViewChild, computed, input, output, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, OnChanges, OnDestroy, OnInit, SimpleChanges, ViewChild, computed, input, output, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { Options } from '@popperjs/core';
@@ -94,7 +94,10 @@ export class WorkOrderDrawerComponent implements OnChanges, OnInit, OnDestroy, A
   @ViewChild('startPicker') private startPicker?: NgbInputDatepicker;
   @ViewChild('endPicker') private endPicker?: NgbInputDatepicker;
 
-  ngOnChanges(): void {
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['value'] && !changes['mode']) {
+      return;
+    }
     const draft = { ...(this.value() ?? this.emptyDraft()) };
     this.form.reset(undefined, { emitEvent: false });
     this.form.setValue({

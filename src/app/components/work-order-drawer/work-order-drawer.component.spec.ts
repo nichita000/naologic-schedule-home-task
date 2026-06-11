@@ -1,3 +1,4 @@
+import { SimpleChange } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { WorkOrderDrawerComponent } from './work-order-drawer.component';
@@ -35,5 +36,48 @@ describe('WorkOrderDrawerComponent', () => {
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
 
     expect(savedName).toBe('Frame Profile Run');
+  });
+
+  it('does not reset typed values when existingOrders changes', () => {
+    const component = fixture.componentInstance;
+
+    component['form'].controls.name.setValue('User-typed name', { emitEvent: false });
+
+    fixture.componentRef.setInput('existingOrders', []);
+    fixture.detectChanges();
+
+    expect(component['form'].controls.name.value).toBe('User-typed name');
+  });
+
+  it('does not reset typed values when workCenters changes', () => {
+    const component = fixture.componentInstance;
+
+    component['form'].controls.name.setValue('Another typed name', { emitEvent: false });
+
+    fixture.componentRef.setInput('workCenters', [
+      { id: 'wc-1', name: 'Genesis Hardware' },
+      { id: 'wc-2', name: 'Second WC' },
+    ]);
+    fixture.detectChanges();
+
+    expect(component['form'].controls.name.value).toBe('Another typed name');
+  });
+
+  it('resets the form when drawer value changes', () => {
+    const component = fixture.componentInstance;
+    const newValue = {
+      name: 'New Value Name',
+      workCenterId: 'wc-1',
+      status: 'in-progress' as const,
+      startDate: '2026-07-01',
+      endDate: '2026-07-07',
+    };
+
+    component['form'].controls.name.setValue('User-typed name', { emitEvent: false });
+
+    fixture.componentRef.setInput('value', newValue);
+    component.ngOnChanges({ value: new SimpleChange(null, newValue, false) });
+
+    expect(component['form'].controls.name.value).toBe('New Value Name');
   });
 });

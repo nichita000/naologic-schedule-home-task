@@ -5,6 +5,7 @@ import {
   findCurrentCellLeft,
   offsetRangeToDateRange,
   placeBar,
+  placementSlotWidthFor,
   ScheduleRulerComponent,
   ScheduleRulerScale,
 } from '../schedule-ruler/schedule-ruler.component';
@@ -221,14 +222,18 @@ export class ScheduleComponent implements AfterViewInit {
   private findAvailablePlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
     const scale = this.rulerScale();
     const width = this.placementWidth();
-    const preferredLeft = Math.floor(Math.max(0, x) / width) * width;
+    // The pill stays one cell wide, but its start snaps at slot granularity:
+    // whole cells for Day/Week, quarter-month "week" sections for Month.
+    const step = placementSlotWidthFor(scale);
     const maxLeft = Math.max(0, this.timelineWidth() - width);
-    const preferredIndex = Math.floor(Math.min(Math.max(preferredLeft, 0), maxLeft) / width);
-    const maxIndex = Math.floor(maxLeft / width);
+    const maxIndex = Math.floor(maxLeft / step);
+    // Centre the pill on the cursor (snapped to the step grid). The candidate
+    // search below shifts it sideways when a neighbouring order is in the way.
+    const preferredIndex = Math.min(Math.max(0, Math.round((x - width / 2) / step)), maxIndex);
     const candidates = this.buildPlacementCandidateIndexes(preferredIndex, maxIndex);
 
     for (const index of candidates) {
-      const left = index * width;
+      const left = index * step;
       const range = offsetRangeToDateRange(scale, this.timelineStartDate(), left, width);
 
       if (!this.overlapsAny(range.startDate, range.endDate, orders)) {
