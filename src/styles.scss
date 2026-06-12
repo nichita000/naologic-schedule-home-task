@@ -59,28 +59,28 @@
   --color-gray-50:  #f9fafb;   // app shell background
 
   // Status — Complete (green)
-  --color-complete-text:   #16a34a;
-  --color-complete-bg:     #dcfce7;
-  --color-complete-border: #bbf7d0;
-  --color-complete-bar:    #d1fae5;  // lighter bar fill
+  --color-complete-text:   #08a268;
+  --color-complete-bg:     #e1ffcc;
+  --color-complete-border: #d1fab3;
+  --color-complete-bar:    #f8fff3;
 
-  // Status — In Progress (indigo, reuses brand)
-  --color-inprogress-text:   var(--color-brand-500);
-  --color-inprogress-bg:     var(--color-brand-50);
-  --color-inprogress-border: var(--color-brand-100);
-  --color-inprogress-bar:    var(--color-brand-50);
+  // Status — In Progress (indigo)
+  --color-inprogress-text:   #3e40db;
+  --color-inprogress-bg:     #d6d8ff;
+  --color-inprogress-border: #dee0ff;
+  --color-inprogress-bar:    #edeeff;
 
   // Status — Blocked (amber / orange)
-  --color-blocked-text:   #d97706;
-  --color-blocked-bg:     #fef3c7;
-  --color-blocked-border: #fde68a;
-  --color-blocked-bar:    #fef9c3;
+  --color-blocked-text:   #b13600;
+  --color-blocked-bg:     #fceeb5;
+  --color-blocked-border: #fff5cf;
+  --color-blocked-bar:    #fffcef;
 
-  // Status — Open (neutral gray)
-  --color-open-text:   var(--color-gray-500);
-  --color-open-bg:     var(--color-gray-100);
-  --color-open-border: var(--color-gray-200);
-  --color-open-bar:    var(--color-gray-100);
+  // Status — Open (cyan)
+  --color-open-text:   #00b0bf;
+  --color-open-bg:     #e4fdff;
+  --color-open-border: #cefbff;
+  --color-open-bar:    #f3feff;
 
   // Feedback
   --color-error-text: #b91c1c;
@@ -106,7 +106,7 @@
   --schedule-header-height:  44px;
 
   // Timeline column widths per zoom level
-  --timeline-col-day:   60px;
+  --timeline-col-day:   200px;
   --timeline-col-week:  90px;
   --timeline-col-month: 110px;
 

@@ -1,4 +1,5 @@
-<div class="schedule">
+<div class="schedule" [class.schedule--interactions-locked]="interactionsLocked()">
+  <!-- LEFT: frozen Work Center column -->
   <aside class="schedule__sidebar">
     <div class="schedule__head">Work Center</div>
     @for (wc of workCenters(); track wc.id) {
@@ -64,86 +65,116 @@
               (mousemove)="onRowMove($event, wc.id)"
               (mouseleave)="clearHover()"
             >
-              @for (order of visibleBarsByCenter()[wc.id]; track order.id) {
+              @for (order of normalPlacedByCenter()[wc.id]; track order.id) {
                 <div
                   class="schedule__bar"
-                  [class.schedule__bar--focused]="visibleFocusedOrderId() === order.id"
                   [style.width.px]="order.width - 8"
                   [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
+                  [class.schedule__bar--focused]="visibleFocusedOrderId() === order.id"
                 >
                   <nao-work-order
                     [name]="order.name"
                     [status]="order.status"
+                    [tooltip]="orderTooltip(order)"
                     (edit)="onOrderAction(order, 'edit')"
                     (delete)="onOrderAction(order, 'delete')"
                   />
                 </div>
               }
 
-              @for (group of compactGroupsByCenter()[wc.id]; track group.left) {
-                <button
-                  type="button"
+              @for (group of compactGroupsByCenter()[wc.id]; track group.id) {
+                <div
                   class="schedule__compact"
-                  [class.schedule__compact--active]="isCompactGroupOpen(wc.id, group.left)"
-                  [attr.aria-label]="group.orders.length + ' compact work orders'"
-                  [attr.aria-expanded]="isCompactGroupOpen(wc.id, group.left)"
-                  [style.transform]="'translate(' + (group.left + 8) + 'px, -50%)'"
-                  (click)="toggleCompactGroup(wc.id, group.left); $event.stopPropagation()"
+                  [style.transform]="'translate(' + group.markerLeft + 'px, -50%)'"
+                  [class.schedule__compact--open]="activeCompactGroupId() === group.id"
+                  [class.schedule__compact--focused]="compactGroupHasFocusedOrder(group)"
                 >
-                  @for (order of visibleCompactDots(group); track order.id) {
-                    <span
-                      class="schedule__compact-dot"
-                      [ngClass]="statusClass(order.status)"
-                    ></span>
-                  }
-
-                  @if (hiddenCompactCount(group) > 0) {
-                    <span class="schedule__compact-count">+{{ hiddenCompactCount(group) }}</span>
-                  }
-                </button>
-
-                @if (isCompactGroupOpen(wc.id, group.left)) {
-                  <div
-                    class="schedule__compact-popover"
-                    [class.schedule__compact-popover--single]="!hasMultipleCompactOrders(group)"
-                    [style.transform]="'translate(' + (group.left + 8) + 'px, 28px)'"
-                    (click)="$event.stopPropagation()"
+                  <button
+                    type="button"
+                    class="schedule__compact-marker"
+                    [class.schedule__compact-marker--pill]="group.pillWidth !== null"
+                    [style.width.px]="group.pillWidth !== null ? group.pillWidth + 8 : null"
+                    [attr.aria-label]="compactTooltip(group)"
+                    [attr.aria-expanded]="activeCompactGroupId() === group.id"
+                    aria-haspopup="dialog"
+                    [naoTooltip]="compactTooltip(group)"
+                    naoTooltipPosition="top"
+                    [naoTooltipDebounce]="300"
+                    (click)="toggleCompactGroup($event, group)"
                   >
-                    @if (hasMultipleCompactOrders(group)) {
-                      <header class="schedule__compact-popover-head">
-                        <strong>Work orders</strong>
-                        <span>{{ compactGroupRange(group) }}</span>
-                        <small>{{ group.orders.length }} total</small>
-                      </header>
-                    }
-
-                    <div class="schedule__compact-popover-list">
-                      @for (order of group.orders; track order.id) {
-                        <article class="schedule__compact-popover-item">
-                          <div class="schedule__compact-popover-bar">
-                            <nao-work-order
-                              hideMenu
-                              [name]="order.name"
-                              [status]="order.status"
-                            />
-                          </div>
-                          <span class="schedule__compact-popover-date">{{ orderDateRange(order) }}</span>
-                          <button
-                            type="button"
-                            class="schedule__compact-popover-action"
-                            aria-label="Open compact work order"
-                            (click)="onCompactOrderFocus(order)"
-                          >
-                            →
-                          </button>
-                        </article>
+                    <span class="schedule__compact-stack" aria-hidden="true">
+                      @if (group.pillWidth !== null) {
+                        <!-- Lone order: duration-proportional pill (1 day stays a dot). -->
+                        <span
+                          class="schedule__compact-dot schedule__compact-dot--pill"
+                          [style.width.px]="group.pillWidth"
+                          [style.--compact-status-color]="compactStatusColor(group.orders[0].status)"
+                        ></span>
+                      } @else {
+                        @for (order of group.orders.slice(0, group.orders.length > 2 ? 2 : 3); track order.id) {
+                          <span
+                            class="schedule__compact-dot"
+                            [style.--compact-status-color]="compactStatusColor(order.status)"
+                          ></span>
+                        }
+                        @if (group.orders.length > 2) {
+                          <!-- Remainder beyond the two visible dots, not the group total. -->
+                          <span class="schedule__compact-count">+{{ group.orders.length - 2 }}</span>
+                        }
                       }
+                    </span>
+                  </button>
+
+                  @if (activeCompactGroupId() === group.id) {
+                    <div
+                      class="schedule__compact-popover"
+                      role="dialog"
+                      [attr.aria-label]="'Compact work orders for ' + wc.name"
+                      [class.schedule__compact-popover--single]="group.orders.length === 1"
+                      [class.schedule__compact-popover--flip-x]="compactPopoverFlip().horizontal"
+                      [class.schedule__compact-popover--flip-y]="compactPopoverFlip().vertical"
+                      [class.schedule__compact-popover--narrow]="compactPopoverMaxWidth() < 420"
+                      [style.maxWidth.px]="compactPopoverMaxWidth()"
+                      (click)="$event.stopPropagation()"
+                    >
+                      @if (group.orders.length > 1) {
+                        <header class="schedule__compact-header">
+                          <span class="schedule__compact-heading">
+                            Work orders
+                            <span class="schedule__compact-range">{{ formatCompactGroupRange(group) }}</span>
+                          </span>
+                          <span class="schedule__compact-total">{{ group.orders.length }} total</span>
+                        </header>
+                      }
+                      <div
+                        class="schedule__compact-list"
+                        [class.schedule__compact-list--scrollable]="group.orders.length > 5"
+                      >
+                        @for (order of group.orders; track order.id) {
+                          <div class="schedule__compact-item">
+                            <span class="schedule__compact-bar">
+                              <nao-work-order hideMenu [name]="order.name" [status]="order.status" />
+                            </span>
+                            <span class="schedule__compact-date">{{ formatCompactRange(order) }}</span>
+                            <button
+                              type="button"
+                              class="schedule__compact-arrow"
+                              [attr.aria-label]="'Focus ' + order.name"
+                              (click)="focusCompactOrder($event, order)"
+                            >
+                              →
+                            </button>
+                          </div>
+                        }
+                      </div>
                     </div>
-                  </div>
-                }
+                  }
+                </div>
               }
 
-              @if (!activeCompactGroup() && hoveredRowId() === wc.id && hoverPlacement(); as placement) {
+              @if (!activeCompactGroupId() && hoveredRowId() === wc.id && hoverPlacement(); as placement) {
+                <!-- Keyed by slot so each snap recreates the element: it
+                     re-appears at the new week instead of sliding across. -->
                 @for (slot of [placement]; track slot.left + '-' + slot.width) {
                   <button
                     type="button"
@@ -151,7 +182,6 @@
                     [style.width.px]="slot.width - 16"
                     [style.transform]="'translate(' + (slot.left + 8) + 'px, -50%)'"
                     naoTooltip="Click to add dates"
-                    [naoTooltipWhenTruncated]="false"
                     naoTooltipPosition="top"
                     [naoTooltipDebounce]="400"
                     (click)="onAddWorkOrder(wc.id)"

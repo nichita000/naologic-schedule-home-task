@@ -61,26 +61,26 @@
 
   // ── Status variants ──────────────────────────────────────────
   &--complete {
-    background: #f8fff3;
-    box-shadow: 0 0 0 1px #d1fab3;
-    .nao-wo__status { background: #e1ffcc; color: #08a268; }
+    background: var(--color-complete-bar);
+    box-shadow: 0 0 0 1px var(--color-complete-border);
+    .nao-wo__status { background: var(--color-complete-bg); color: var(--color-complete-text); }
   }
 
   &--in-progress {
-    background: #edeeff;
-    box-shadow: 0 0 0 1px #dee0ff;
-    .nao-wo__status { background: #d6d8ff; color: #3e40db; }
+    background: var(--color-inprogress-bar);
+    box-shadow: 0 0 0 1px var(--color-inprogress-border);
+    .nao-wo__status { background: var(--color-inprogress-bg); color: var(--color-inprogress-text); }
   }
 
   &--blocked {
-    background: #fffcef;
-    box-shadow: 0 0 0 1px #fff5cf;
-    .nao-wo__status { background: #fceeb5; color: #b13600; }
+    background: var(--color-blocked-bar);
+    box-shadow: 0 0 0 1px var(--color-blocked-border);
+    .nao-wo__status { background: var(--color-blocked-bg); color: var(--color-blocked-text); }
   }
 
   &--open {
-    background: #f3feff;
-    box-shadow: 0 0 0 1px #cefbff;
-    .nao-wo__status { background: #e4fdff; color: #00b0bf; }
+    background: var(--color-open-bar);
+    box-shadow: 0 0 0 1px var(--color-open-border);
+    .nao-wo__status { background: var(--color-open-bg); color: var(--color-open-text); }
   }
 }

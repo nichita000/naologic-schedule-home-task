@@ -22,7 +22,7 @@ export const Default: Story = {
   args: { name: 'Konsulting Inc', status: BadgeStatus.InProgress },
 };
 
-/** Hover the truncated name to reveal the Artboard tooltip. */
+/** Narrow bar example: hover the name to reveal the full label tooltip. */
 export const TruncatedName: Story = {
   args: {
     name: 'Konsulting International Manufacturing Group',

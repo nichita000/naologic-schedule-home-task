@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Timescale } from '../timescale/timescale.component';
-import { buildRulerCells, offsetRangeToDateRange, ScheduleRulerComponent } from './schedule-ruler.component';
+import { buildRulerCells, offsetRangeToDateRange, slotToDateRange, ScheduleRulerComponent } from './schedule-ruler.component';
 
 describe('ScheduleRulerComponent', () => {
   let fixture: ComponentFixture<ScheduleRulerComponent>;
@@ -55,12 +55,13 @@ describe('ScheduleRulerComponent', () => {
   });
 
   it('renders week labels as date ranges with a year', () => {
+    // Cells are anchored to startDate itself (not startOfWeek(startDate)),
+    // so weeks run from whatever day startDate falls on.
     const cells = buildRulerCells(Timescale.Week, '2024-08-01', '2024-08-14');
 
     expect(cells.map(cell => cell.label)).toEqual([
-      '29 Jul-4 Aug 2024',
-      '5-11 Aug 2024',
-      '12-18 Aug 2024',
+      '1-7 Aug 2024',
+      '8-14 Aug 2024',
     ]);
   });
 
@@ -68,5 +69,26 @@ describe('ScheduleRulerComponent', () => {
     const range = offsetRangeToDateRange(Timescale.Month, '2026-06-01', 57, 57);
 
     expect(range).toEqual({ startDate: '2026-06-15', endDate: '2026-06-30' });
+  });
+
+  // ── Bug 4: week scale slot 0 must not step back before timelineStartDate ─
+
+  it('week scale slot 0 should start on or after timelineStartDate', () => {
+    // 2026-01-01 is a Thursday. Before the fix, startOfWeek drifted back to
+    // 2025-12-29 (Monday), returning a range that starts before timelineStartDate.
+    const result = slotToDateRange(Timescale.Week, '2026-01-01', 0);
+
+    expect(result.startDate >= '2026-01-01').toBeTrue();
+    expect(result.startDate).toBe('2026-01-01');
+  });
+
+  it('week scale subsequent slots advance by exactly 7 days from startDate', () => {
+    const slot0 = slotToDateRange(Timescale.Week, '2026-01-01', 0);
+    const slot1 = slotToDateRange(Timescale.Week, '2026-01-01', 1);
+    const slot2 = slotToDateRange(Timescale.Week, '2026-01-01', 2);
+
+    expect(slot0.startDate).toBe('2026-01-01');
+    expect(slot1.startDate).toBe('2026-01-08');
+    expect(slot2.startDate).toBe('2026-01-15');
   });
 });

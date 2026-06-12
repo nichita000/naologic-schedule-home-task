@@ -513,6 +513,29 @@ describe('ScheduleComponent', () => {
     expect(component.normalPlacedByCenter()['wc-1'].map(order => order.id)).toEqual(['wo-visible']);
   });
 
+  it('teleports near a distant focus target instead of smooth-scrolling the whole way', fakeAsync(() => {
+    fixture.componentRef.setInput('scale', Timescale.Day);
+    fixture.componentRef.setInput('timelineStartDate', '2026-01-01');
+    fixture.componentRef.setInput('timelineEndDate', '2027-12-31');
+    fixture.componentRef.setInput('workOrders', []);
+    fixture.detectChanges();
+    tick();
+
+    const element = fixture.nativeElement.querySelector('.schedule__timeline-scroll') as HTMLElement;
+    element.scrollLeft = 0;
+
+    fixture.componentRef.setInput('focusDate', '2027-06-01');
+    fixture.componentRef.setInput('focusRequestId', 1);
+    fixture.detectChanges();
+    tick();
+
+    // Day scale: 2027-06-01 is 516 days from range start → target is
+    // 516 × 200 − one cell of lead-in = 103 000px. The instant jump lands two
+    // viewports before it; only that final stretch is animated.
+    const target = 516 * 200 - 200;
+    expect(element.scrollLeft).toBe(Math.max(target - element.clientWidth * 2, 0));
+  }));
+
   it('culls orders outside the timeline range and clips bars at the track edge', () => {
     fixture.componentRef.setInput('scale', Timescale.Day);
     fixture.componentRef.setInput('timelineStartDate', '2026-01-01');

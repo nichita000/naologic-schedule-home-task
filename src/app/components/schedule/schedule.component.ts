@@ -158,6 +158,14 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
    * write would abort the in-flight smooth scroll.
    */
   private suppressScrollPreservation = false;
+  /**
+   * Focus targets farther than this many viewports teleport to the approach
+   * side of the target and smooth-scroll only the final stretch. Viewports,
+   * not years: the same number of years is 2.7k px at Month scale but 146k px
+   * at Day scale, while "two screens of glide" feels identical at any zoom.
+   * Matches the window's trailing buffer, so the glide is fully rendered.
+   */
+  private static readonly FOCUS_GLIDE_VIEWPORTS = 2;
   readonly interactionsLocked = computed(() =>
     (this.interactionLayer?.suppressBackgroundHover() ?? false) || !!this.timelineLoadingSide()
   );
@@ -533,6 +541,18 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
     const left = dateToOffset(this.rulerScale(), this.timelineStartDate(), focusDate);
     const target = Math.max(left - this.cellWidth(), 0);
+    const glideDistance = element.clientWidth * ScheduleComponent.FOCUS_GLIDE_VIEWPORTS;
+    const offset = target - element.scrollLeft;
+
+    if (Math.abs(offset) > glideDistance) {
+      // Distant target: teleport to the approach side first, then glide the
+      // final stretch. A smooth scroll across years of timeline gets
+      // compressed by the browser into an unreadable blur — a short glide
+      // over fully rendered content reads as "arriving at the order".
+      element.scrollLeft = target - Math.sign(offset) * glideDistance;
+      this.syncScrollLeft(element);
+    }
+
     element.scrollTo({
       left: target,
       behavior: 'smooth',

@@ -28,6 +28,11 @@ export class WorkOrderComponent {
    * for read-only previews — e.g. the overlap-conflict bar inside form errors.
    */
   readonly hideMenu = input<boolean, unknown>(false, { transform: booleanAttribute });
+  /**
+   * Rich tooltip shown on hover anywhere over the bar (e.g. "Name · date range").
+   * When set it replaces the name span's truncation-only tooltip.
+   */
+  readonly tooltip = input<string>('');
 
   /** Emitted when Edit is chosen from the context menu. */
   readonly edit = output<void>();

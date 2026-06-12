@@ -1,4 +1,5 @@
-import { Directive, ElementRef, OnDestroy, OnInit, Renderer2, inject, input } from '@angular/core';
+import { Directive, ElementRef, OnDestroy, OnInit, Renderer2, effect, inject, input } from '@angular/core';
+import { InteractionLayerService } from '../../services/interaction-layer.service';
 
 export type TooltipPosition =
   | 'top-left'
@@ -88,8 +89,6 @@ export function calculateTooltipPosition(
 
 /**
  * Shows a styled tooltip (the design-system `.nao-tooltip`) on hover.
- * By default it only appears when the host's text is truncated, which makes it
- * ideal for ellipsised labels (e.g. a work-order name in a narrow bar).
  *
  * Usage: `<span class="..." [naoTooltip]="name()">{{ name() }}</span>`
  */
@@ -100,8 +99,6 @@ export function calculateTooltipPosition(
 export class TooltipDirective implements OnInit, OnDestroy {
   /** Tooltip text. */
   readonly text = input<string>('', { alias: 'naoTooltip' });
-  /** Only show when the host content is overflowing (default true). */
-  readonly onlyWhenTruncated = input<boolean>(true, { alias: 'naoTooltipWhenTruncated' });
   /** Tooltip placement relative to the host. */
   readonly position = input<TooltipPosition>('top-left', { alias: 'naoTooltipPosition' });
   /** Delay in ms before the tooltip appears on hover (default 0 = instant). */
@@ -109,10 +106,19 @@ export class TooltipDirective implements OnInit, OnDestroy {
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly renderer = inject(Renderer2);
+  private readonly interactionLayer = inject(InteractionLayerService, { optional: true });
 
   private tip: HTMLElement | null = null;
   private showTimer: ReturnType<typeof setTimeout> | null = null;
   private cleanup: Array<() => void> = [];
+
+  constructor() {
+    effect(() => {
+      if (this.interactionLayer?.suppressTooltips()) {
+        this.cancel();
+      }
+    });
+  }
 
   ngOnInit(): void {
     const el = this.hostRef.nativeElement;
@@ -129,6 +135,10 @@ export class TooltipDirective implements OnInit, OnDestroy {
 
   /** Show after the configured debounce; a 0 delay shows immediately. */
   private scheduleShow(): void {
+    if (this.interactionLayer?.suppressTooltips()) {
+      return;
+    }
+
     const delay = this.debounceMs();
     if (delay <= 0) {
       this.show();
@@ -156,8 +166,8 @@ export class TooltipDirective implements OnInit, OnDestroy {
   private show(): void {
     const el = this.hostRef.nativeElement;
     const label = this.text();
+    if (this.interactionLayer?.suppressTooltips()) return;
     if (!label || this.tip) return;
-    if (this.onlyWhenTruncated() && el.scrollWidth <= el.clientWidth) return;
 
     const tip = this.renderer.createElement('div') as HTMLElement;
     tip.className = 'nao-tooltip';

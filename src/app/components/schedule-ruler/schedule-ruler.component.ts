@@ -11,8 +11,13 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Timescale } from '../timescale/timescale.component';
+import { addDays, daysBetween, parseIsoDate, startOfDay, startOfWeek, toIsoDate } from '../../utils/date-utils';
 
 export type ScheduleRulerScale = Exclude<Timescale, Timescale.Hour>;
+
+const DAY_CELL_WIDTH = 200;
+const WEEK_CELL_WIDTH = 150;
+const MONTH_CELL_WIDTH = 114;
 
 interface RulerCell {
   key: string;
@@ -98,8 +103,8 @@ export class ScheduleRulerComponent implements AfterViewInit, OnDestroy {
 }
 
 export function buildRulerCells(scale: ScheduleRulerScale, startDate: string, endDate: string): RulerCell[] {
-  const start = startOfDay(parseDate(startDate));
-  const end = startOfDay(parseDate(endDate));
+  const start = startOfDay(parseIsoDate(startDate));
+  const end = startOfDay(parseIsoDate(endDate));
 
   if (end < start) {
     return [];
@@ -123,8 +128,8 @@ export function findCurrentCellLeft(
   endDate: string,
   current: Date,
 ): number | null {
-  const start = startOfDay(parseDate(startDate));
-  const end = startOfDay(parseDate(endDate));
+  const start = startOfDay(parseIsoDate(startDate));
+  const end = startOfDay(parseIsoDate(endDate));
   const now = startOfDay(current);
 
   if (now < start || now > end) {
@@ -133,26 +138,13 @@ export function findCurrentCellLeft(
 
   switch (scale) {
     case Timescale.Day:
-      return daysBetween(start, now) * 64;
+      return daysBetween(start, now) * DAY_CELL_WIDTH;
     case Timescale.Week:
-      return (daysBetween(startOfWeek(start), startOfWeek(now)) / 7) * 150;
+      return Math.floor(daysBetween(start, now) / 7) * WEEK_CELL_WIDTH;
     case Timescale.Month:
     default:
-      return ((now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth()) * 114;
+      return ((now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth()) * MONTH_CELL_WIDTH;
   }
-}
-
-/**
- * Calendar-day difference between two local dates. Raw `getTime()` deltas
- * drift by ±1h across DST transitions, which makes `floor(diff / DAY_MS)`
- * lose a whole day (e.g. winter start → summer date); normalising through
- * UTC removes the offset entirely.
- */
-function daysBetween(start: Date, end: Date): number {
-  const DAY_MS = 86_400_000;
-  const utcStart = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
-  const utcEnd = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-  return Math.round((utcEnd - utcStart) / DAY_MS);
 }
 
 /** ISO date one slot before the period containing `current` (for the timeline start). */
@@ -172,15 +164,15 @@ export function timelineStartBefore(scale: ScheduleRulerScale, current: Date): s
 
 /** Each month is divided into this many equal placement sections ("weeks"). */
 const MONTH_SECTIONS = 4;
-const MONTH_SECTION_WIDTH = 114 / MONTH_SECTIONS;
+const MONTH_SECTION_WIDTH = MONTH_CELL_WIDTH / MONTH_SECTIONS;
 
 /** Pixel width of one placement slot for the given scale. */
 export function placementSlotWidthFor(scale: ScheduleRulerScale): number {
   switch (scale) {
     case Timescale.Day:
-      return 64;
+      return DAY_CELL_WIDTH;
     case Timescale.Week:
-      return 150;
+      return WEEK_CELL_WIDTH;
     case Timescale.Month:
     default:
       return MONTH_SECTION_WIDTH;
@@ -204,22 +196,22 @@ export function snapPreviewLeft(scale: ScheduleRulerScale, left: number): number
 
 /** Pixel offset of the slot that contains `date` (Month → section, Week/Day → cell). */
 export function dateToOffset(scale: ScheduleRulerScale, startDate: string, dateIso: string): number {
-  const start = startOfDay(parseDate(startDate));
-  const date = startOfDay(parseDate(dateIso));
+  const start = startOfDay(parseIsoDate(startDate));
+  const date = startOfDay(parseIsoDate(dateIso));
 
   switch (scale) {
     case Timescale.Day:
-      return daysBetween(start, date) * 64;
+      return daysBetween(start, date) * DAY_CELL_WIDTH;
 
     case Timescale.Week:
-      return Math.floor(daysBetween(startOfWeek(start), date) / 7) * 150;
+      return Math.floor(daysBetween(start, date) / 7) * WEEK_CELL_WIDTH;
 
     case Timescale.Month:
     default: {
       const months = (date.getFullYear() - start.getFullYear()) * 12 + date.getMonth() - start.getMonth();
       // Day 1-7 → section 0, 8-14 → 1, 15-21 → 2, 22+ → 3.
       const section = Math.min(Math.floor((date.getDate() - 1) / 7), MONTH_SECTIONS - 1);
-      return months * 114 + section * MONTH_SECTION_WIDTH;
+      return months * MONTH_CELL_WIDTH + section * MONTH_SECTION_WIDTH;
     }
   }
 }
@@ -249,12 +241,12 @@ export function offsetRangeToDateRange(
   return { startDate: startRange.startDate, endDate: endRange.endDate };
 }
 
-function slotToDateRange(
+export function slotToDateRange(
   scale: ScheduleRulerScale,
   startDate: string,
   slot: number,
 ): { startDate: string; endDate: string } {
-  const start = startOfDay(parseDate(startDate));
+  const start = startOfDay(parseIsoDate(startDate));
 
   switch (scale) {
     case Timescale.Day: {
@@ -263,7 +255,7 @@ function slotToDateRange(
     }
 
     case Timescale.Week: {
-      const date = addDays(startOfWeek(start), slot * 7);
+      const date = addDays(start, slot * 7);
       return { startDate: toIsoDate(date), endDate: toIsoDate(addDays(date, 6)) };
     }
 
@@ -299,13 +291,6 @@ function slotWidthFor(scale: ScheduleRulerScale): number {
   return placementSlotWidthFor(scale);
 }
 
-function toIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function buildMonthCells(start: Date, end: Date): RulerCell[] {
   const cells: RulerCell[] = [];
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -318,11 +303,11 @@ function buildMonthCells(start: Date, end: Date): RulerCell[] {
     cells.push({
       key: `${year}-${month}`,
       label: `${cursor.toLocaleString('en-US', { month: 'short' })} ${year}`,
-      width: 114,
+      width: MONTH_CELL_WIDTH,
       left,
     });
 
-    left += 114;
+    left += MONTH_CELL_WIDTH;
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
@@ -331,7 +316,7 @@ function buildMonthCells(start: Date, end: Date): RulerCell[] {
 
 function buildWeekCells(start: Date, end: Date): RulerCell[] {
   const cells: RulerCell[] = [];
-  const cursor = startOfWeek(start);
+  const cursor = new Date(start);
   let left = 0;
 
   while (cursor <= end) {
@@ -340,11 +325,11 @@ function buildWeekCells(start: Date, end: Date): RulerCell[] {
     cells.push({
       key: cursor.toISOString(),
       label: formatWeekRange(cursor, weekEnd),
-      width: 150,
+      width: WEEK_CELL_WIDTH,
       left,
     });
 
-    left += 150;
+    left += WEEK_CELL_WIDTH;
     cursor.setDate(cursor.getDate() + 7);
   }
 
@@ -360,38 +345,15 @@ function buildDayCells(start: Date, end: Date): RulerCell[] {
     cells.push({
       key: cursor.toISOString(),
       label: `${cursor.toLocaleString('en-US', { month: 'short' })} ${cursor.getDate()}`,
-      width: 64,
+      width: DAY_CELL_WIDTH,
       left,
     });
 
-    left += 64;
+    left += DAY_CELL_WIDTH;
     cursor.setDate(cursor.getDate() + 1);
   }
 
   return cells;
-}
-
-function parseDate(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfWeek(date: Date): Date {
-  const result = startOfDay(date);
-  const day = result.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diff);
-  return result;
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
 }
 
 function formatWeekRange(start: Date, end: Date): string {

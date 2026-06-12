@@ -1,5 +1,11 @@
-<div class="nao-wo" [ngClass]="'nao-wo--' + status()">
-  <span class="nao-wo__name" [naoTooltip]="name()" naoTooltipPosition="top-left">{{ name() }}</span>
+<div
+  class="nao-wo"
+  [ngClass]="'nao-wo--' + status()"
+  [naoTooltip]="tooltip()"
+  naoTooltipPosition="top"
+  [naoTooltipDebounce]="400"
+>
+  <span class="nao-wo__name" [naoTooltip]="tooltip() ? '' : name()" naoTooltipPosition="top-left">{{ name() }}</span>
   <span class="nao-wo__status">{{ statusLabel }}</span>
   @if (!hideMenu()) {
     <nao-dropdown

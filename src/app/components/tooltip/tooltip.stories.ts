@@ -43,7 +43,6 @@ export const Default: Story = {
               style="margin:0; font: 14px Circular-Std, sans-serif; color:#030929;"
               [naoTooltip]="position + ' ' + label"
               [naoTooltipPosition]="position"
-              [naoTooltipWhenTruncated]="false"
             >
               Hover {{ position }}
             </p>
