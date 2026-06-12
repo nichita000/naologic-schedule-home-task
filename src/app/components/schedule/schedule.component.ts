@@ -112,6 +112,8 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   readonly focusRequestId = input<number>(0);
   /** Optional work-order id to highlight after focusing its date. */
   readonly focusedOrderId = input<string | null>(null);
+  /** Edge currently waiting for remote work orders before the range expands. */
+  readonly timelineLoadingSide = input<'start' | 'end' | null>(null);
 
   /** Emitted when the user clicks the hover "add" pill on a row. */
   readonly addWorkOrder = output<AddWorkOrderRequest>();
@@ -121,6 +123,8 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   readonly orderAction = output<{ order: ScheduleOrder; action: WorkOrderAction }>();
   /** Emitted when a compact month marker should be opened in a more detailed scale. */
   readonly compactOrderFocus = output<ScheduleOrder>();
+  /** Emitted when the scrollport approaches either horizontal edge. */
+  readonly timelineEdgeReached = output<'start' | 'end'>();
 
   readonly hoveredRowId = signal<string | null>(null);
   /** Free placement span of the hover "add" pill, or null when the cursor is over an occupied range. */
@@ -139,7 +143,24 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   private focusSettleTimer: ReturnType<typeof setTimeout> | null = null;
   private cleanupFocusScroll: (() => void) | null = null;
   private resizeObserver?: ResizeObserver;
-  readonly interactionsLocked = computed(() => this.interactionLayer?.suppressBackgroundHover() ?? false);
+  private lastEdgeRequestKey: string | null = null;
+  private lastFocusScrollKey: string | null = null;
+  private lastLeadInScrollKey: string | null = null;
+  private previousTimelineStartDate: string | null = null;
+  private previousTimelineWidth: number | null = null;
+  private momentumRafId: number | null = null;
+  private lastTrackedScrollLeft = 0;
+  /**
+   * Set for the duration of one microtask cycle when a focus scroll has just
+   * been initiated. A range prepend in the same tick (saving an order dated
+   * before the range) must NOT apply scroll preservation then: the focus
+   * target is already in the new coordinate space, and an instant scrollLeft
+   * write would abort the in-flight smooth scroll.
+   */
+  private suppressScrollPreservation = false;
+  readonly interactionsLocked = computed(() =>
+    (this.interactionLayer?.suppressBackgroundHover() ?? false) || !!this.timelineLoadingSide()
+  );
 
   readonly rulerScale = computed<ScheduleRulerScale>(() => {
     const scale = this.scale();
@@ -155,10 +176,12 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   );
 
   /**
-   * Horizontal virtualisation window, in track pixels. One full viewport of
-   * buffer on each side: a fling cannot out-scroll a screen per frame, so the
-   * buffered cells are always painted before they become visible. Until the
-   * viewport is measured, everything renders.
+   * Horizontal virtualisation window, in track pixels. Two viewports of buffer
+   * behind and ahead: the compositor scrolls ahead of JS scroll events during
+   * a fast fling, so the window must survive a multi-frame event gap without
+   * exposing unrendered cells (a rAF tracker re-syncs it every frame as a
+   * second line of defence). Until the viewport is measured, everything
+   * renders.
    */
   readonly renderWindow = computed<{ start: number; end: number }>(() => {
     const viewport = this.viewportWidth();
@@ -168,7 +191,7 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     }
 
     const left = this.scrollLeft();
-    return { start: left - viewport, end: left + viewport * 2 };
+    return { start: left - viewport * 2, end: left + viewport * 3 };
   });
 
   /** Timeline cells inside the render window — drives the vertical grid lines. */
@@ -196,20 +219,37 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   readonly normalPlacedByCenter = computed<Record<string, PlacedOrder[]>>(() => {
     const map: Record<string, PlacedOrder[]> = {};
     const { start, end } = this.renderWindow();
+    const trackWidth = this.timelineWidth();
     for (const center of this.workCenters()) {
       map[center.id] = (this.placedByCenter()[center.id] ?? [])
         .filter(order => !this.isCompactOrder(order)
+          // Orders outside the declared timeline range (e.g. persisted future
+          // orders restored before the range is re-extended) must never reach
+          // the DOM: a bar past the track's width inflates scrollWidth and
+          // opens a phantom, cell-less scroll area.
+          && order.left < trackWidth
+          && order.left + order.width > 0
           && order.left + order.width >= start
-          && order.left <= end);
+          && order.left <= end)
+        // Same reason: a bar that starts inside the range but ends past it is
+        // clipped at the track edge instead of overflowing the scrollport.
+        .map(order => order.left + order.width > trackWidth
+          ? { ...order, width: trackWidth - order.left }
+          : order);
     }
     return map;
   });
 
   readonly compactGroupsByCenter = computed<Record<string, CompactOrderGroup[]>>(() => {
     const map: Record<string, CompactPlacedOrder[]> = {};
+    const trackWidth = this.timelineWidth();
     for (const center of this.workCenters()) {
       map[center.id] = (this.placedByCenter()[center.id] ?? [])
-        .filter(order => this.isCompactOrder(order))
+        // Same range cull as full bars: compactMarkerLeft clamps to the track
+        // edge, so an out-of-range order would otherwise pin a marker there.
+        .filter(order => this.isCompactOrder(order)
+          && order.left < trackWidth
+          && order.left + order.width > 0)
         .map(order => ({
           ...order,
           markerLeft: this.compactMarkerLeft(order),
@@ -290,11 +330,61 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
       queueMicrotask(() => {
         if (this.focusDate()) {
-          this.scrollToFocusDate();
+          const focusKey = [
+            this.rulerScale(),
+            this.focusDate(),
+            this.focusRequestId(),
+            this.focusedOrderId(),
+          ].join(':');
+
+          if (focusKey !== this.lastFocusScrollKey) {
+            this.lastFocusScrollKey = focusKey;
+            this.scrollToFocusDate();
+          }
           return;
         }
-        this.scrollToCurrentPeriodLeadIn();
+
+        const leadInKey = [
+          this.rulerScale(),
+          this.currentDate() ?? 'today',
+        ].join(':');
+
+        if (leadInKey !== this.lastLeadInScrollKey) {
+          this.lastLeadInScrollKey = leadInKey;
+          this.scrollToCurrentPeriodLeadIn();
+        }
       });
+    });
+
+    effect(() => {
+      const startDate = this.timelineStartDate();
+      const width = this.timelineWidth();
+      this.viewReady();
+
+      const previousStartDate = this.previousTimelineStartDate;
+      const previousWidth = this.previousTimelineWidth;
+      this.previousTimelineStartDate = startDate;
+      this.previousTimelineWidth = width;
+
+      if (!this.viewReady() || !previousStartDate || previousWidth === null || startDate >= previousStartDate) {
+        return;
+      }
+
+      // Width delta of the actual cell grid, not a date conversion: week cells
+      // align to startOfWeek, so dateToOffset can be off by one cell at Week
+      // scale, which would desync the preserved scroll position.
+      const addedWidth = width - previousWidth;
+      queueMicrotask(() => this.preserveScrollAfterPrependedRange(addedWidth));
+    });
+
+    effect(() => {
+      // Re-arm edge requests whenever a load cycle ends. After a successful
+      // extension the range (and thus the key) changes anyway — this matters
+      // when a load fails and the range stays put: without it, that edge
+      // could never request again.
+      if (!this.timelineLoadingSide()) {
+        this.lastEdgeRequestKey = null;
+      }
     });
   }
 
@@ -322,10 +412,91 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.cancelPendingFocusAnimation();
     this.resizeObserver?.disconnect();
+
+    if (this.momentumRafId !== null) {
+      cancelAnimationFrame(this.momentumRafId);
+      this.momentumRafId = null;
+    }
   }
 
   onTimelineScroll(event: Event): void {
-    this.scrollLeft.set((event.target as HTMLElement).scrollLeft);
+    const element = event.target as HTMLElement;
+    this.syncScrollLeft(element);
+    this.requestRangeExtensionIfNeeded(element);
+    this.trackMomentum(element);
+  }
+
+  private syncScrollLeft(element: HTMLElement): void {
+    this.lastTrackedScrollLeft = element.scrollLeft;
+    this.scrollLeft.set(element.scrollLeft);
+  }
+
+  /**
+   * Scroll events lag behind the compositor during a fast fling (and can be
+   * starved entirely while the main thread is busy), which lets the visual
+   * position outrun the render window. This per-frame tracker reads the real
+   * scrollLeft until it stops changing, so the window stays glued to whatever
+   * the user actually sees.
+   */
+  private trackMomentum(element: HTMLElement): void {
+    if (this.momentumRafId !== null || typeof requestAnimationFrame === 'undefined') {
+      return;
+    }
+
+    let idleFrames = 0;
+
+    const tick = () => {
+      if (element.scrollLeft !== this.lastTrackedScrollLeft) {
+        idleFrames = 0;
+        this.syncScrollLeft(element);
+      } else if (++idleFrames >= 3) {
+        this.momentumRafId = null;
+        return;
+      }
+
+      this.momentumRafId = requestAnimationFrame(tick);
+    };
+
+    this.momentumRafId = requestAnimationFrame(tick);
+  }
+
+  private requestRangeExtensionIfNeeded(element: HTMLElement): void {
+    if (this.timelineLoadingSide()) {
+      return;
+    }
+
+    const maxScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0);
+    const distanceToEnd = maxScrollLeft - element.scrollLeft;
+    const threshold = Math.max(element.clientWidth * 1.5, this.cellWidth() * 4);
+
+    const side =
+      element.scrollLeft <= threshold ? 'start' :
+        distanceToEnd <= threshold ? 'end' :
+          null;
+
+    if (!side) {
+      return;
+    }
+
+    const requestKey = `${side}:${this.timelineStartDate()}:${this.timelineEndDate()}`;
+    if (requestKey === this.lastEdgeRequestKey) {
+      return;
+    }
+
+    this.lastEdgeRequestKey = requestKey;
+    this.timelineEdgeReached.emit(side);
+  }
+
+  private preserveScrollAfterPrependedRange(addedWidth: number): void {
+    const element = this.timelineScroll?.nativeElement;
+
+    if (!element || addedWidth <= 0 || this.suppressScrollPreservation) {
+      return;
+    }
+
+    const nextScrollLeft = element.scrollLeft + addedWidth;
+    element.scrollLeft = nextScrollLeft;
+    this.syncScrollLeft(element);
   }
 
   private today(): Date {
@@ -369,6 +540,13 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     // Render the destination right away so the smooth scroll lands on painted
     // content instead of waiting for scroll events to move the window.
     this.scrollLeft.set(target);
+
+    // The target is computed against the CURRENT (possibly just-prepended)
+    // range, so scroll preservation queued in this same tick must stand down.
+    this.suppressScrollPreservation = true;
+    queueMicrotask(() => {
+      this.suppressScrollPreservation = false;
+    });
 
     if (focusedOrderId) {
       this.runAfterScrollSettles(element, () => {

@@ -15,7 +15,7 @@ import {
 } from '../../components/work-order-drawer/work-order-drawer.component';
 import { WorkOrderDeleteDialogComponent } from '../../components/work-order-delete-dialog/work-order-delete-dialog.component';
 import { ScheduleStore } from '../../services/schedule.store';
-import { addDays, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
+import { addDays, addMonths, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
 import { formatDateRangeShort } from '../../utils/format-date-range';
 
 @Component({
@@ -40,10 +40,11 @@ export class SchedulePageComponent {
   readonly focusedOrderId = signal<string | null>(null);
   readonly addPreviewRange = signal<{ startDate: string; endDate: string } | null>(null);
   readonly addPreviewRangeKey = signal(0);
+  readonly timelineLoadingSide = signal<'start' | 'end' | null>(null);
   readonly workCenters = this.scheduleStore.workCenters;
   readonly workOrders = this.scheduleStore.workOrders;
-  readonly timelineStartDate = `${new Date().getFullYear() - 2}-01-01`;
-  readonly timelineEndDate = `${new Date().getFullYear() + 2}-12-31`;
+  readonly timelineStartDate = signal(`${new Date().getFullYear() - 2}-01-01`);
+  readonly timelineEndDate = signal(`${new Date().getFullYear() + 2}-12-31`);
 
   setTimescale(v: Timescale): void {
     this.timescale.set(v);
@@ -61,9 +62,61 @@ export class SchedulePageComponent {
   }
 
   focusToday(): void {
+    this.expandTimelineToInclude(toIsoDate(new Date()));
     this.focusDate.set(toIsoDate(new Date()));
     this.focusedOrderId.set(null);
     this.focusRequestId.update(value => value + 1);
+  }
+
+  /**
+   * Years appended per edge load. Must comfortably exceed the scroll-trigger
+   * threshold at the densest scale (Month: a year is only ~1.4k px), so one
+   * extension never lands inside the next trigger zone and loads cannot chain.
+   */
+  private static readonly TIMELINE_CHUNK_YEARS = 5;
+
+  async extendTimeline(side: 'start' | 'end'): Promise<void> {
+    if (this.timelineLoadingSide()) {
+      return;
+    }
+
+    this.timelineLoadingSide.set(side);
+
+    try {
+      const chunk = SchedulePageComponent.TIMELINE_CHUNK_YEARS;
+      const edgeYear = side === 'start'
+        ? parseIsoDate(this.timelineStartDate()).getFullYear()
+        : parseIsoDate(this.timelineEndDate()).getFullYear();
+      const years = Array.from({ length: chunk }, (_, index) =>
+        side === 'start' ? edgeYear - 1 - index : edgeYear + 1 + index);
+
+      await Promise.all(years.map(year => this.scheduleStore.loadWorkOrdersForYear(year)));
+
+      if (this.timelineLoadingSide() !== side) {
+        return;
+      }
+
+      this.extendTimelineRange(side);
+    } catch (error) {
+      // The range stays put on failure; the schedule re-arms its edge request
+      // when the loading flag clears, so the user can retry by scrolling.
+      console.error('[extendTimeline] failed to load work orders', error);
+    } finally {
+      if (this.timelineLoadingSide() === side) {
+        this.timelineLoadingSide.set(null);
+      }
+    }
+  }
+
+  private extendTimelineRange(side: 'start' | 'end'): void {
+    const months = SchedulePageComponent.TIMELINE_CHUNK_YEARS * 12;
+
+    if (side === 'start') {
+      this.timelineStartDate.update(value => toIsoDate(addMonths(parseIsoDate(value), -months)));
+      return;
+    }
+
+    this.timelineEndDate.update(value => toIsoDate(addMonths(parseIsoDate(value), months)));
   }
 
   setAddPreviewRange(range: { startDate: string; endDate: string } | null): void {
@@ -142,9 +195,44 @@ export class SchedulePageComponent {
   }
 
   private focusSavedOrder(order: ScheduleOrder): void {
+    this.expandTimelineToInclude(order.startDate);
+    this.expandTimelineToInclude(order.endDate);
     this.focusDate.set(order.startDate);
     this.focusedOrderId.set(order.id);
     this.focusRequestId.update(value => value + 1);
+  }
+
+  private expandTimelineToInclude(dateIso: string): void {
+    // A malformed date would never satisfy the loop conditions' lexicographic
+    // comparisons and could loop forever.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
+      return;
+    }
+
+    const previousStartYear = parseIsoDate(this.timelineStartDate()).getFullYear();
+    const previousEndYear = parseIsoDate(this.timelineEndDate()).getFullYear();
+
+    while (dateIso < this.timelineStartDate()) {
+      this.timelineStartDate.update(value => toIsoDate(addMonths(parseIsoDate(value), -12)));
+    }
+
+    while (dateIso > this.timelineEndDate()) {
+      this.timelineEndDate.update(value => toIsoDate(addMonths(parseIsoDate(value), 12)));
+    }
+
+    // Backfill orders for the years this expansion pulled into range —
+    // otherwise edge preloads (which start from the new edge) would skip them
+    // forever. Fire-and-forget: the store merges idempotently as data lands.
+    const startYear = parseIsoDate(this.timelineStartDate()).getFullYear();
+    const endYear = parseIsoDate(this.timelineEndDate()).getFullYear();
+
+    for (let year = startYear; year < previousStartYear; year += 1) {
+      this.scheduleStore.loadWorkOrdersForYear(year).catch(() => undefined);
+    }
+
+    for (let year = previousEndYear + 1; year <= endYear; year += 1) {
+      this.scheduleStore.loadWorkOrdersForYear(year).catch(() => undefined);
+    }
   }
 
   private getEndDateForDuration(startDate: string, duration: number): string {
@@ -171,4 +259,5 @@ export class SchedulePageComponent {
 
     return nextStart;
   }
+
 }

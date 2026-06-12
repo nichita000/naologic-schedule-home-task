@@ -1,7 +1,7 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { BadgeStatus } from '../components/badge/badge.component';
 import { WORK_ORDERS } from '../data/schedule-seed';
-import { ScheduleStore } from './schedule.store';
+import { REMOTE_LOAD_DELAY_MS, ScheduleStore } from './schedule.store';
 
 const STORAGE_KEY = 'naologic.schedule.workOrders.v1';
 
@@ -75,6 +75,28 @@ describe('ScheduleStore', () => {
 
     expect(store.workOrders().length).toBe(WORK_ORDERS.length);
   });
+
+  it('loads remote future work orders with a fake delay', fakeAsync(() => {
+    const currentYear = new Date().getFullYear();
+    const store = createStore();
+    const initialCount = store.workOrders().length;
+    let loaded = false;
+
+    store.loadWorkOrdersForYear(currentYear + 3).then(() => {
+      loaded = true;
+    });
+
+    tick(REMOTE_LOAD_DELAY_MS - 1);
+
+    expect(loaded).toBeFalse();
+    expect(store.workOrders().length).toBe(initialCount);
+
+    tick(1);
+
+    expect(loaded).toBeTrue();
+    expect(store.workOrders().some(order => order.id === `remote-${currentYear + 3}-extrusion-run`)).toBeTrue();
+    expect(readStoredOrders().some(order => order.id === `remote-${currentYear + 3}-extrusion-run`)).toBeTrue();
+  }));
 
   function createStore(): ScheduleStore {
     TestBed.configureTestingModule({});

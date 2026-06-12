@@ -1,50 +1,54 @@
-<main class="schedule-page">
-  <img class="schedule-page__logo" src="assets/naologic-logo.svg" alt="Naologic" />
+<!-- ─── TOP BAR ────────────────────────────────────────────────── -->
+<header class="nao-topbar">
+  <img class="nao-topbar__logo" src="assets/naologic-logo.svg" alt="Naologic" />
+</header>
 
-  <section class="schedule-page__content">
-    <h1 class="schedule-page__title">Work Orders</h1>
+<!-- ─── PAGE ───────────────────────────────────────────────────── -->
+<main class="nao-page">
+  <h1 class="nao-page__title">Work Orders</h1>
 
-    <div class="schedule-page__toolbar">
-      <div class="schedule-page__toolbar-controls">
-        <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
-        <button class="schedule-page__today" type="button" (click)="focusToday()">
-          Today
-        </button>
-      </div>
-
-      <span
-        class="schedule-page__preview-range"
-        [class.schedule-page__preview-range--visible]="addPreviewRange()"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        @if (addPreviewRange()) {
-          @for (_ of [addPreviewRangeKey()]; track _) {
-            <span class="schedule-page__preview-range-text">
-              {{ formatAddPreviewRange() }}
-            </span>
-          }
+  <div class="nao-page__toolbar">
+    <div class="nao-page__toolbar-controls">
+      <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+      <button class="nao-page__today" type="button" (click)="focusToday()">
+        Today
+      </button>
+    </div>
+    <span
+      class="nao-page__preview-range"
+      [class.nao-page__preview-range--visible]="addPreviewRange() || timelineLoadingSide()"
+      [class.nao-page__preview-range--loading]="timelineLoadingSide()"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      @if (timelineLoadingSide()) {
+        <span class="nao-page__preview-spinner" role="status" aria-label="Loading work orders"></span>
+      } @else if (addPreviewRange()) {
+        @for (_ of [addPreviewRangeKey()]; track _) {
+          <span class="nao-page__preview-range-text">
+            {{ formatAddPreviewRange() }}
+          </span>
         }
-      </span>
-    </div>
+      }
+    </span>
+  </div>
 
-    <div class="schedule-page__schedule">
-      <nao-schedule
-        [workCenters]="workCenters()"
-        [workOrders]="workOrders()"
-        [scale]="timescale()"
-        [timelineStartDate]="timelineStartDate"
-        [timelineEndDate]="timelineEndDate"
-        [focusDate]="focusDate()"
-        [focusRequestId]="focusRequestId()"
-        [focusedOrderId]="focusedOrderId()"
-        (addWorkOrder)="openCreate($event)"
-        (addPreviewRangeChange)="setAddPreviewRange($event)"
-        (orderAction)="handleOrderAction($event)"
-        (compactOrderFocus)="focusCompactOrder($event)"
-      />
-    </div>
-  </section>
+  <nao-schedule
+    [workCenters]="workCenters()"
+    [workOrders]="workOrders()"
+    [scale]="timescale()"
+    [timelineStartDate]="timelineStartDate()"
+    [timelineEndDate]="timelineEndDate()"
+    [focusDate]="focusDate()"
+    [focusRequestId]="focusRequestId()"
+    [focusedOrderId]="focusedOrderId()"
+    [timelineLoadingSide]="timelineLoadingSide()"
+    (addWorkOrder)="openCreate($event)"
+    (addPreviewRangeChange)="setAddPreviewRange($event)"
+    (orderAction)="handleOrderAction($event)"
+    (compactOrderFocus)="focusCompactOrder($event)"
+    (timelineEdgeReached)="extendTimeline($event)"
+  />
 </main>
 
 @if (deleteTarget(); as order) {

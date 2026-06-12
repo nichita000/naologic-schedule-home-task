@@ -1,29 +1,44 @@
-.schedule-page {
-  min-height: 100vh;
-  background: var(--color-surface-muted);
-  padding: 46px 64px 80px;
+// Design reference: Sketch "Desktop HD" artboard (1440 wide).
+// Left content margin 101px, logo at top 20px.
+$toolbar-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
+
+:host {
+  display: block;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+// ── TOP BAR (logo only, no bar/divider) ──────────────────────────
+.nao-topbar {
+  display: flex;
+  align-items: center;
+  padding: 20px 0 0 101px;
 
   &__logo {
-    display: block;
-    width: 121px;
+    width: 80px;
     height: auto;
+    display: block;
   }
+}
 
-  &__content {
-    margin-top: 86px;
-  }
+// ── PAGE ─────────────────────────────────────────────────────────
+.nao-page {
+  padding: 0 0 0 101px;
 
   &__title {
-    margin: 0 0 32px;
-    color: var(--color-ink-900);
-    font-size: 32px;
+    font-size: var(--font-size-2xl);
     font-weight: 700;
-    letter-spacing: -0.03em;
+    color: var(--color-gray-900);
+    letter-spacing: -0.02em;
+    margin: 65px 0 0;
   }
 
   &__toolbar {
     display: flex;
     align-items: center;
+    margin-top: 22px;
+    margin-bottom: 30px;
     padding-right: 24px;
   }
 
@@ -41,7 +56,7 @@
     border: 0;
     border-radius: 6px;
     background: var(--color-surface);
-    box-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
+    box-shadow: $toolbar-shadow;
     color: var(--color-brand-600);
     font-family: var(--font-family);
     font-size: var(--font-size-base);
@@ -69,8 +84,8 @@
     align-items: center;
     justify-content: center;
     margin-left: auto;
-    min-width: 118px;
     height: 28px;
+    min-width: 118px;
     padding: 0 10px;
     border-radius: 6px;
     background: var(--color-gray-100);
@@ -81,24 +96,36 @@
     overflow: hidden;
     pointer-events: none;
     transform: translateY(4px) scale(0.98);
-    transition:
-      opacity 140ms ease-out,
-      transform 140ms ease-out;
     white-space: nowrap;
   }
 
+  // Transition lives on the visible state only: the pill fades IN, but hides
+  // instantly. Its content unmounts in the same tick the class drops, so a
+  // fade-out could only ever show an empty gray box.
   &__preview-range--visible {
     opacity: 1;
     transform: translateY(0) scale(1);
+    transition:
+      opacity 140ms ease-out,
+      transform 140ms ease-out;
+  }
+
+  &__preview-range--loading {
+    min-width: 40px;
+    padding: 0;
   }
 
   &__preview-range-text {
     animation: preview-range-text-in 140ms ease-out;
   }
 
-  &__schedule {
-    margin-top: 44px;
-    margin-right: -64px;
+  &__preview-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(104, 113, 150, 0.18);
+    border-top-color: var(--color-brand-500);
+    border-radius: 50%;
+    animation: preview-loading-spin 720ms linear infinite;
   }
 }
 
@@ -107,9 +134,21 @@
     opacity: 0;
     transform: translateY(5px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes preview-loading-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nao-page__preview-spinner,
+  .nao-page__preview-range-text {
+    animation: none;
   }
 }

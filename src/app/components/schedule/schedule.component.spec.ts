@@ -513,6 +513,69 @@ describe('ScheduleComponent', () => {
     expect(component.normalPlacedByCenter()['wc-1'].map(order => order.id)).toEqual(['wo-visible']);
   });
 
+  it('culls orders outside the timeline range and clips bars at the track edge', () => {
+    fixture.componentRef.setInput('scale', Timescale.Day);
+    fixture.componentRef.setInput('timelineStartDate', '2026-01-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-01-31');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-straddling',
+        name: 'Straddles Range End',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-01-25',
+        endDate: '2026-02-10',
+      },
+      {
+        id: 'wo-outside',
+        name: 'Beyond Range',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-03-01',
+        endDate: '2026-03-05',
+      },
+    ]);
+    fixture.detectChanges();
+
+    // Window wide enough to reach both orders, so any exclusion below is the
+    // range cull, not the virtualisation window.
+    (component as any).viewportWidth.set(4000);
+    (component as any).scrollLeft.set(0);
+    fixture.detectChanges();
+
+    const bars = component.normalPlacedByCenter()['wc-1'];
+    const trackWidth = component.timelineWidth();
+
+    expect(bars.map(order => order.id)).toEqual(['wo-straddling']);
+    expect(bars[0].left + bars[0].width).toBe(trackWidth);
+  });
+
+  it('emits an edge request once per timeline range when scrolling near an edge', () => {
+    const emitted: Array<'start' | 'end'> = [];
+    fixture.componentInstance.timelineEdgeReached.subscribe(side => emitted.push(side));
+    fixture.componentRef.setInput('scale', Timescale.Day);
+    fixture.componentRef.setInput('timelineStartDate', '2026-01-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-01-31');
+    fixture.detectChanges();
+
+    component.onTimelineScroll({
+      target: { scrollLeft: 100, scrollWidth: 6200, clientWidth: 1000 },
+    } as unknown as Event);
+    component.onTimelineScroll({
+      target: { scrollLeft: 120, scrollWidth: 6200, clientWidth: 1000 },
+    } as unknown as Event);
+
+    expect(emitted).toEqual(['start']);
+
+    fixture.componentRef.setInput('timelineStartDate', '2025-01-01');
+    fixture.detectChanges();
+    component.onTimelineScroll({
+      target: { scrollLeft: 100, scrollWidth: 79_200, clientWidth: 1000 },
+    } as unknown as Event);
+
+    expect(emitted).toEqual(['start', 'start']);
+  });
+
   function moveRowAt(x: number): void {
     component.onRowMove({
       clientX: x,

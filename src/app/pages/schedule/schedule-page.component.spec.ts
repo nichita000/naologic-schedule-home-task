@@ -1,6 +1,6 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { SchedulePageComponent } from './schedule-page.component';
 import { ScheduleStore } from '../../services/schedule.store';
 import { Timescale } from '../../components/timescale/timescale.component';
@@ -22,6 +22,7 @@ function makeStore(orders: ScheduleOrder[] = []) {
     createWorkOrder,
     updateWorkOrder: jasmine.createSpy('updateWorkOrder'),
     deleteWorkOrder: jasmine.createSpy('deleteWorkOrder'),
+    loadWorkOrdersForYear: jasmine.createSpy('loadWorkOrdersForYear').and.returnValue(Promise.resolve()),
     _ordersSignal: workOrdersSignal,
   };
 }
@@ -57,6 +58,66 @@ describe('SchedulePageComponent', () => {
       expect(component.focusDate()).toBe(expectedToday);
       expect(component.focusedOrderId()).toBeNull();
       expect(component.focusRequestId()).toBe(2);
+    });
+  });
+
+  describe('timeline range', () => {
+    it('loads a five-year chunk before extending the timeline near either edge', fakeAsync(() => {
+      const { component, store } = createComponent();
+      component.timelineStartDate.set('2026-01-01');
+      component.timelineEndDate.set('2026-12-31');
+
+      component.extendTimeline('start');
+      tick();
+      component.extendTimeline('end');
+      tick();
+
+      expect(component.timelineStartDate()).toBe('2021-01-01');
+      expect(component.timelineEndDate()).toBe('2031-12-31');
+      // Every year of both chunks is requested, not just the nearest one.
+      for (const year of [2021, 2022, 2023, 2024, 2025, 2027, 2028, 2029, 2030, 2031]) {
+        expect(store.loadWorkOrdersForYear).toHaveBeenCalledWith(year);
+      }
+    }));
+
+    it('shows a loading side and ignores duplicate edge requests while loading', fakeAsync(() => {
+      const { component, store } = createComponent();
+      let resolveLoad!: () => void;
+      store.loadWorkOrdersForYear.and.returnValue(new Promise<void>(resolve => {
+        resolveLoad = resolve;
+      }));
+
+      component.extendTimeline('end');
+      component.extendTimeline('start');
+
+      expect(component.timelineLoadingSide()).toBe('end');
+      const endYear = new Date().getFullYear() + 2;
+      expect(store.loadWorkOrdersForYear).toHaveBeenCalledTimes(5);
+      expect(store.loadWorkOrdersForYear).toHaveBeenCalledWith(endYear + 1);
+      expect(store.loadWorkOrdersForYear).toHaveBeenCalledWith(endYear + 5);
+
+      resolveLoad();
+      tick();
+
+      expect(component.timelineLoadingSide()).toBeNull();
+    }));
+
+    it('expands the timeline before focusing a saved future order', () => {
+      const { component } = createComponent();
+      component.timelineEndDate.set('2028-12-31');
+      component.drawerMode.set('create');
+
+      component.saveDrawer({
+        name: 'Future Run',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2031-05-10',
+        endDate: '2031-05-12',
+      });
+
+      expect(component.timelineEndDate()).toBe('2031-12-31');
+      expect(component.focusDate()).toBe('2031-05-10');
+      expect(component.focusedOrderId()).toBe('wo-created');
     });
   });
 
