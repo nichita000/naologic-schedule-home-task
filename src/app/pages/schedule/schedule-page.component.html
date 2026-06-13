@@ -10,24 +10,44 @@
   <div class="nao-page__toolbar">
     <div class="nao-page__toolbar-controls">
       <nao-timescale [value]="timescale()" (valueChange)="setTimescale($event)" />
+      <nao-status-filter [value]="statusFilter()" (valueChange)="setStatusFilter($event)" />
       <button class="nao-page__today" type="button" (click)="focusToday()">
         Today
       </button>
     </div>
     <span
       class="nao-page__preview-range"
-      [class.nao-page__preview-range--visible]="addPreviewRange() || timelineLoadingSide()"
+      [class.nao-page__preview-range--visible]="addPreviewRange() || timelineLoadingSide() || toolbarNotification()"
       [class.nao-page__preview-range--loading]="timelineLoadingSide()"
+      [class.nao-page__preview-range--notification]="toolbarNotification() && !timelineLoadingSide()"
+      [ngClass]="toolbarNotification() && !timelineLoadingSide() ? 'nao-page__preview-range--' + toolbarNotification()!.type : ''"
       aria-live="polite"
       aria-atomic="true"
     >
       @if (timelineLoadingSide()) {
         <span class="nao-page__preview-spinner" role="status" aria-label="Loading work orders"></span>
-      } @else if (addPreviewRange()) {
-        @for (_ of [addPreviewRangeKey()]; track _) {
-          <span class="nao-page__preview-range-text">
-            {{ formatAddPreviewRange() }}
-          </span>
+      } @else {
+        @if (toolbarNotification(); as notification) {
+          @for (_ of [notification.id]; track _) {
+            <span class="nao-page__notification-message">
+              <span class="nao-page__notification-dot" aria-hidden="true"></span>
+              {{ notification.message }}
+            </span>
+            <button
+              class="nao-page__notification-dismiss"
+              type="button"
+              aria-label="Dismiss notification"
+              (click)="dismissNotification(notification.id)"
+            >
+              ×
+            </button>
+          }
+        } @else if (addPreviewRange()) {
+          @for (_ of [addPreviewRangeKey()]; track _) {
+            <span class="nao-page__preview-range-text">
+              {{ formatAddPreviewRange() }}
+            </span>
+          }
         }
       }
     </span>
@@ -35,7 +55,7 @@
 
   <nao-schedule
     [workCenters]="workCenters()"
-    [workOrders]="workOrders()"
+    [workOrders]="visibleWorkOrders()"
     [scale]="timescale()"
     [timelineStartDate]="timelineStartDate()"
     [timelineEndDate]="timelineEndDate()"

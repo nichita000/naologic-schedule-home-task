@@ -51,6 +51,7 @@ $toolbar-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
   &__today {
     display: inline-flex;
     align-items: center;
+    margin-left: 12px;
     height: 28px;
     padding: 0 12px;
     border: 0;
@@ -97,6 +98,10 @@ $toolbar-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
     pointer-events: none;
     transform: translateY(4px) scale(0.98);
     white-space: nowrap;
+    transition:
+      background var(--transition-fast),
+      border-color var(--transition-fast),
+      color var(--transition-fast);
   }
 
   // Transition lives on the visible state only: the pill fades IN, but hides
@@ -115,8 +120,102 @@ $toolbar-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
     padding: 0;
   }
 
+  &__preview-range--notification {
+    gap: 8px;
+    min-width: 0;
+    max-width: min(360px, calc(100vw - 360px));
+    pointer-events: auto;
+  }
+
+  &__preview-range--success {
+    color: var(--color-complete-text);
+  }
+
+  &__preview-range--error {
+    color: var(--color-error-text);
+  }
+
+  &__preview-range--warning {
+    color: var(--color-blocked-text);
+  }
+
+  &__preview-range--info {
+    color: var(--color-open-text);
+  }
+
   &__preview-range-text {
     animation: preview-range-text-in 140ms ease-out;
+  }
+
+  &__notification-message {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    line-height: 1;
+    text-overflow: ellipsis;
+    animation: preview-range-text-in 160ms ease-out;
+  }
+
+  &__notification-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-brand-500);
+  }
+
+  &__preview-range--success &__notification-dot {
+    background: var(--color-complete-text);
+  }
+
+  &__preview-range--error &__notification-dot {
+    background: var(--color-error-text);
+  }
+
+  &__preview-range--warning &__notification-dot {
+    background: var(--color-blocked-text);
+  }
+
+  &__preview-range--info &__notification-dot {
+    background: var(--color-open-text);
+  }
+
+  &__notification-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-right: -3px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: currentColor;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0.62;
+    transition:
+      background var(--transition-fast),
+      opacity var(--transition-fast),
+      transform var(--transition-fast);
+
+    &:hover {
+      background: rgba(104, 113, 150, 0.12);
+      opacity: 1;
+      transform: scale(1.04);
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgba(79, 70, 229, 0.28);
+      outline-offset: 2px;
+    }
   }
 
   &__preview-spinner {

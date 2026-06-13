@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TimescaleComponent, Timescale } from '../../components/timescale/timescale.component';
+import { StatusFilterComponent, StatusFilterValue } from '../../components/status-filter/status-filter.component';
 import {
   AddWorkOrderRequest,
   ScheduleComponent,
@@ -15,6 +16,7 @@ import {
 } from '../../components/work-order-drawer/work-order-drawer.component';
 import { WorkOrderDeleteDialogComponent } from '../../components/work-order-delete-dialog/work-order-delete-dialog.component';
 import { ScheduleStore } from '../../services/schedule.store';
+import { NotificationService } from '../../services/notification.service';
 import { addDays, addMonths, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
 import { formatDateRangeShort } from '../../utils/format-date-range';
 
@@ -22,14 +24,23 @@ import { formatDateRangeShort } from '../../utils/format-date-range';
   selector: 'app-schedule-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, TimescaleComponent, ScheduleComponent, WorkOrderDrawerComponent, WorkOrderDeleteDialogComponent],
+  imports: [
+    CommonModule,
+    TimescaleComponent,
+    StatusFilterComponent,
+    ScheduleComponent,
+    WorkOrderDrawerComponent,
+    WorkOrderDeleteDialogComponent,
+  ],
   templateUrl: './schedule-page.component.html',
   styleUrl: './schedule-page.component.scss',
 })
 export class SchedulePageComponent {
   private readonly scheduleStore = inject(ScheduleStore);
+  readonly notifications = inject(NotificationService);
 
   readonly timescale = signal<Timescale>(Timescale.Day);
+  readonly statusFilter = signal<StatusFilterValue>('all');
   readonly drawerMode = signal<WorkOrderDrawerMode>('create');
   readonly drawerValue = signal<WorkOrderDrawerValue | null>(null);
   readonly drawerOpen = signal(false);
@@ -41,15 +52,33 @@ export class SchedulePageComponent {
   readonly addPreviewRange = signal<{ startDate: string; endDate: string } | null>(null);
   readonly addPreviewRangeKey = signal(0);
   readonly timelineLoadingSide = signal<'start' | 'end' | null>(null);
+  readonly toolbarNotification = computed(() => {
+    const notifications = this.notifications.notifications();
+    return notifications[notifications.length - 1] ?? null;
+  });
   readonly workCenters = this.scheduleStore.workCenters;
   readonly workOrders = this.scheduleStore.workOrders;
+  readonly visibleWorkOrders = computed(() => {
+    const status = this.statusFilter();
+    const orders = this.workOrders();
+
+    return status === 'all' ? orders : orders.filter(order => order.status === status);
+  });
   readonly timelineStartDate = signal(`${new Date().getFullYear() - 2}-01-01`);
   readonly timelineEndDate = signal(`${new Date().getFullYear() + 2}-12-31`);
+
+  dismissNotification(id: number): void {
+    this.notifications.dismiss(id);
+  }
 
   setTimescale(v: Timescale): void {
     this.timescale.set(v);
     this.focusDate.set(null);
     this.focusedOrderId.set(null);
+  }
+
+  setStatusFilter(value: StatusFilterValue): void {
+    this.statusFilter.set(value);
   }
 
   focusCompactOrder(order: ScheduleOrder): void {
@@ -165,6 +194,7 @@ export class SchedulePageComponent {
     const target = this.deleteTarget();
     if (target) {
       this.scheduleStore.deleteWorkOrder(target.id);
+      this.notifications.open(`Deleted "${target.name}"`, 'success');
     }
     this.deleteTarget.set(null);
   }
@@ -181,14 +211,17 @@ export class SchedulePageComponent {
     if (this.drawerMode() === 'edit') {
       if (!value.id) {
         console.error('[saveDrawer] edit mode received value without id — cannot update, aborting to prevent duplicate');
+        this.notifications.open('Unable to update this work order. Please reopen it and try again.', 'error');
         return;
       }
       const updated = { ...value, id: value.id };
       this.scheduleStore.updateWorkOrder(updated);
       this.focusSavedOrder(updated);
+      this.notifications.open(`Updated "${updated.name}"`, 'success');
     } else {
       const created = this.scheduleStore.createWorkOrder(value);
       this.focusSavedOrder(created);
+      this.notifications.open(`Created "${created.name}"`, 'success');
     }
 
     this.closeDrawer();

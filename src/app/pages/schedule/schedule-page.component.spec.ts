@@ -7,6 +7,7 @@ import { Timescale } from '../../components/timescale/timescale.component';
 import { BadgeStatus } from '../../components/badge/badge.component';
 import { WorkOrderDrawerValue } from '../../components/work-order-drawer/work-order-drawer.component';
 import { ScheduleOrder, WorkCenter } from '../../components/schedule/schedule.component';
+import { NotificationService } from '../../services/notification.service';
 
 function makeStore(orders: ScheduleOrder[] = []) {
   const workOrdersSignal = signal<ScheduleOrder[]>(orders);
@@ -30,16 +31,64 @@ function makeStore(orders: ScheduleOrder[] = []) {
 describe('SchedulePageComponent', () => {
   function createComponent(orders: ScheduleOrder[] = []) {
     const mockStore = makeStore(orders);
+    const mockNotifications = {
+      open: jasmine.createSpy('open'),
+      dismiss: jasmine.createSpy('dismiss'),
+      notifications: signal([]).asReadonly(),
+    };
     TestBed.configureTestingModule({
       imports: [SchedulePageComponent],
-      providers: [{ provide: ScheduleStore, useValue: mockStore }],
+      providers: [
+        { provide: ScheduleStore, useValue: mockStore },
+        { provide: NotificationService, useValue: mockNotifications },
+      ],
       schemas: [NO_ERRORS_SCHEMA],
     });
     const fixture = TestBed.createComponent(SchedulePageComponent);
-    return { component: fixture.componentInstance, store: mockStore };
+    return { component: fixture.componentInstance, store: mockStore, notifications: mockNotifications };
   }
 
   afterEach(() => TestBed.resetTestingModule());
+
+  it('dismisses toolbar notifications', () => {
+    const { component, notifications } = createComponent();
+
+    component.dismissNotification(12);
+
+    expect(notifications.dismiss).toHaveBeenCalledWith(12);
+  });
+
+  describe('status filter', () => {
+    const orders: ScheduleOrder[] = [
+      { id: 'wo-open', name: 'Open Order', workCenterId: 'wc-1', status: BadgeStatus.Open, startDate: '2026-01-01', endDate: '2026-01-02' },
+      { id: 'wo-complete', name: 'Complete Order', workCenterId: 'wc-1', status: BadgeStatus.Complete, startDate: '2026-01-03', endDate: '2026-01-04' },
+      { id: 'wo-blocked', name: 'Blocked Order', workCenterId: 'wc-1', status: BadgeStatus.Blocked, startDate: '2026-01-05', endDate: '2026-01-06' },
+    ];
+
+    it('shows all work orders by default', () => {
+      const { component } = createComponent(orders);
+
+      expect(component.visibleWorkOrders().map(order => order.id)).toEqual(['wo-open', 'wo-complete', 'wo-blocked']);
+    });
+
+    it('shows only matching work orders when a status is selected', () => {
+      const { component } = createComponent(orders);
+
+      component.setStatusFilter(BadgeStatus.Complete);
+
+      expect(component.visibleWorkOrders().map(order => order.id)).toEqual(['wo-complete']);
+    });
+
+    it('keeps all orders available for overlap checks while the visible list is filtered', () => {
+      const { component } = createComponent(orders);
+      component.setStatusFilter(BadgeStatus.Open);
+
+      component.openCreate({ workCenterId: 'wc-1', startDate: '2026-01-03', endDate: '2026-01-04', left: 0, width: 200 });
+
+      expect(component.visibleWorkOrders().map(order => order.id)).toEqual(['wo-open']);
+      expect(component.drawerValue()?.startDate).toBe('2026-01-07');
+    });
+  });
 
   describe('focusToday', () => {
     it('focuses the schedule on today and increments the request id for repeated clicks', () => {
@@ -145,11 +194,31 @@ describe('SchedulePageComponent', () => {
     });
   });
 
+  describe('delete confirmation', () => {
+    it('deletes the selected work order and notifies the user', () => {
+      const { component, store, notifications } = createComponent();
+      component.deleteTarget.set({
+        id: 'wo-delete',
+        name: 'Trim Batch',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+      });
+
+      component.confirmDelete();
+
+      expect(store.deleteWorkOrder).toHaveBeenCalledWith('wo-delete');
+      expect(component.deleteTarget()).toBeNull();
+      expect(notifications.open).toHaveBeenCalledWith('Deleted "Trim Batch"', 'success');
+    });
+  });
+
   // ── Bug 1: saveDrawer silent duplicate ─────────────────────────────────
 
   describe('saveDrawer — edit mode with missing id', () => {
     it('should not call createWorkOrder and should not close the drawer', () => {
-      const { component, store } = createComponent();
+      const { component, store, notifications } = createComponent();
 
       component.drawerMode.set('edit');
       component.drawerOpen.set(true);
@@ -167,10 +236,14 @@ describe('SchedulePageComponent', () => {
       expect(store.createWorkOrder).not.toHaveBeenCalled();
       expect(store.updateWorkOrder).not.toHaveBeenCalled();
       expect(component.drawerOpen()).toBeTrue();
+      expect(notifications.open).toHaveBeenCalledWith(
+        'Unable to update this work order. Please reopen it and try again.',
+        'error',
+      );
     });
 
     it('edit mode with a valid id should update, not create', () => {
-      const { component, store } = createComponent();
+      const { component, store, notifications } = createComponent();
       component.drawerMode.set('edit');
 
       component.saveDrawer({
@@ -184,6 +257,7 @@ describe('SchedulePageComponent', () => {
 
       expect(store.updateWorkOrder).toHaveBeenCalledWith(jasmine.objectContaining({ id: 'wo-test-123' }));
       expect(store.createWorkOrder).not.toHaveBeenCalled();
+      expect(notifications.open).toHaveBeenCalledWith('Updated "Valid Edit"', 'success');
     });
 
     it('focuses the updated work order after saving an edit', () => {
@@ -205,7 +279,7 @@ describe('SchedulePageComponent', () => {
     });
 
     it('create mode should call createWorkOrder regardless of id', () => {
-      const { component, store } = createComponent();
+      const { component, store, notifications } = createComponent();
       component.drawerMode.set('create');
 
       component.saveDrawer({
@@ -218,6 +292,7 @@ describe('SchedulePageComponent', () => {
 
       expect(store.createWorkOrder).toHaveBeenCalled();
       expect(store.updateWorkOrder).not.toHaveBeenCalled();
+      expect(notifications.open).toHaveBeenCalledWith('Created "New Order"', 'success');
     });
 
     it('focuses the created work order returned by the store', () => {

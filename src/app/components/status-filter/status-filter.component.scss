@@ -1,0 +1,121 @@
+// Matches the Timescale segmented control so filters read as one toolbar family.
+$filter-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
+
+.nao-status-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--timescale-bg);
+  box-shadow: $filter-shadow;
+  font-size: var(--font-size-base);
+  user-select: none;
+
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--color-gray-500);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  &__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 52px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    background: var(--color-surface);
+    color: var(--color-brand-600);
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__chevron {
+    display: block;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: transform var(--transition-fast);
+  }
+
+  &--open &__chevron {
+    transform: rotate(180deg);
+  }
+
+  &__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+  }
+
+  &__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 200px;
+    padding: 4px;
+    border-radius: 5px;
+    background: var(--color-surface);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.06);
+    z-index: 50;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #2f3059;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    text-align: left;
+    transition: background var(--transition-fast);
+
+    &:hover {
+      background: var(--color-gray-100);
+    }
+
+    &--active {
+      color: var(--color-brand-600);
+    }
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    height: auto;
+    padding: 0;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  &__badge--open {
+    color: var(--color-open-text);
+  }
+
+  &__badge--in-progress {
+    color: var(--color-inprogress-text);
+  }
+
+  &__badge--complete {
+    color: var(--color-complete-text);
+  }
+
+  &__badge--blocked {
+    color: var(--color-blocked-text);
+  }
+}
