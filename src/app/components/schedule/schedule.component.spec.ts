@@ -168,6 +168,95 @@ describe('ScheduleComponent', () => {
     });
   });
 
+  it('sizes the week add preview to the free day run after a compact order', () => {
+    fixture.componentRef.setInput('scale', Timescale.Week);
+    fixture.componentRef.setInput('timelineStartDate', '2026-06-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-07-31');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-compact',
+        name: 'Daily Check',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-06-01',
+        endDate: '2026-06-03',
+      },
+      {
+        id: 'wo-next',
+        name: 'Weekly Assembly',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.InProgress,
+        startDate: '2026-06-08',
+        endDate: '2026-06-14',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt((150 / 7) * 3.5);
+
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-06-04');
+    expect(placement?.endDate).toBe('2026-06-07');
+    expect(placement?.left).toBeCloseTo((150 / 7) * 3, 5);
+    expect(placement?.width).toBeCloseTo((150 / 7) * 4, 5);
+  });
+
+  it('extends the week add preview backward when the next order is less than a week away', () => {
+    fixture.componentRef.setInput('scale', Timescale.Week);
+    fixture.componentRef.setInput('timelineStartDate', '2026-06-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-07-31');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-next',
+        name: 'Weekly Assembly',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.InProgress,
+        startDate: '2026-06-13',
+        endDate: '2026-06-20',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt((150 / 7) * 10.5);
+
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-06-06');
+    expect(placement?.endDate).toBe('2026-06-12');
+    expect(placement?.width).toBeCloseTo(150, 5);
+  });
+
+  it('skips one and two day week gaps when placing the add preview', () => {
+    fixture.componentRef.setInput('scale', Timescale.Week);
+    fixture.componentRef.setInput('timelineStartDate', '2026-06-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-07-31');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-before',
+        name: 'Before',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-06-01',
+        endDate: '2026-06-03',
+      },
+      {
+        id: 'wo-after-small-gap',
+        name: 'After Small Gap',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-06-06',
+        endDate: '2026-06-09',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt((150 / 7) * 3.5);
+
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-06-10');
+    expect(placement?.endDate).toBe('2026-06-16');
+    expect(placement?.width).toBeCloseTo(150, 5);
+  });
+
   it('does not skip the first visible free day after an order that started before the viewport', () => {
     fixture.componentRef.setInput('scale', Timescale.Day);
     fixture.componentRef.setInput('timelineStartDate', '2026-06-09');

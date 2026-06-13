@@ -799,6 +799,11 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
   private findAvailablePlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
     const scale = this.rulerScale();
+
+    if (scale === Timescale.Week) {
+      return this.findAvailableWeekPlacement(x, orders);
+    }
+
     const width = this.placementWidth();
     // The pill stays one cell wide, but its start snaps at slot granularity:
     // whole cells for Day/Week, quarter-month "week" sections for Month.
@@ -824,6 +829,73 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
       if (!this.overlapsAny(range.startDate, range.endDate, orders)) {
         return { left, width, ...range };
       }
+    }
+
+    return null;
+  }
+
+  /** The week add pill spans from a useful 3-day range up to one week. */
+  private static readonly WEEK_ADD_MIN_DAYS = 3;
+  private static readonly WEEK_ADD_MAX_DAYS = 7;
+
+  /**
+   * Week view renders compact orders at day precision, so the add pill must do
+   * the same. It finds the nearest free day-run around the cursor, ignores tiny
+   * 1-2 day gaps, then fills 3-7 days. If the full week cannot fit ahead, it
+   * extends backward while still covering the hovered day.
+   */
+  private findAvailableWeekPlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
+    const dayWidth = this.cellWidth() / 7;
+    const timelineStart = parseIsoDate(this.timelineStartDate());
+    const maxDay = Math.max(Math.ceil(this.timelineWidth() / dayWidth) - 1, 0);
+    const cursorDay = Math.min(Math.max(Math.floor(Math.max(0, x) / dayWidth), 0), maxDay);
+
+    const occupied = new Set<number>();
+    for (const order of orders) {
+      const startDay = daysBetween(timelineStart, parseIsoDate(order.startDate));
+      const endDay = daysBetween(timelineStart, parseIsoDate(order.endDate));
+      for (let day = startDay; day <= endDay; day += 1) {
+        occupied.add(day);
+      }
+    }
+
+    for (const candidateDay of this.buildPlacementCandidateIndexes(cursorDay, maxDay)) {
+      if (occupied.has(candidateDay)) {
+        continue;
+      }
+
+      let runStart = candidateDay;
+      while (runStart - 1 >= 0 && !occupied.has(runStart - 1)) {
+        runStart -= 1;
+      }
+
+      let runEnd = candidateDay;
+      while (runEnd + 1 <= maxDay && !occupied.has(runEnd + 1)) {
+        runEnd += 1;
+      }
+
+      const runLength = runEnd - runStart + 1;
+      if (runLength < ScheduleComponent.WEEK_ADD_MIN_DAYS) {
+        continue;
+      }
+
+      const span = Math.min(ScheduleComponent.WEEK_ADD_MAX_DAYS, runLength);
+      let startDay = candidateDay;
+      if (startDay + span - 1 > runEnd) {
+        startDay = runEnd - span + 1;
+      }
+      if (startDay < runStart) {
+        startDay = runStart;
+      }
+
+      const startDate = addDays(timelineStart, startDay);
+      const endDate = addDays(startDate, span - 1);
+      return {
+        left: startDay * dayWidth,
+        width: span * dayWidth,
+        startDate: toIsoDate(startDate),
+        endDate: toIsoDate(endDate),
+      };
     }
 
     return null;
