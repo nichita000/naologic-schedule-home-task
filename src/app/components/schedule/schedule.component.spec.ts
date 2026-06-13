@@ -28,15 +28,14 @@ describe('ScheduleComponent', () => {
 
     moveRowAt(114 * 4 + 70);
 
-    expect(component.hoverPlacement()).toEqual({
-      left: 456,
-      width: 114,
-      startDate: '2026-09-01',
-      endDate: '2026-09-30',
-    });
+    const placement = component.hoverPlacement();
+    expect(placement?.left).toBe(456);
+    expect(placement?.width).toBeCloseTo(114, 5);
+    expect(placement?.startDate).toBe('2026-09-01');
+    expect(placement?.endDate).toBe('2026-09-30');
   });
 
-  it('shifts the month add preview to the first free week section of a partially occupied month', () => {
+  it('starts the month add preview at the first free day after an order and runs a full month', () => {
     fixture.componentRef.setInput('scale', Timescale.Month);
     fixture.componentRef.setInput('workOrders', [
       {
@@ -52,15 +51,95 @@ describe('ScheduleComponent', () => {
 
     moveRowAt(114 * 4 + 70);
 
-    // The order occupies September's first week, so the month-wide pill
-    // snaps to the next free quarter-month section (Sep 8) instead of
-    // jumping to October entirely.
-    expect(component.hoverPlacement()).toEqual({
-      left: 484.5,
-      width: 114,
-      startDate: '2026-09-08',
-      endDate: '2026-10-07',
-    });
+    // Sep is occupied through the 5th, so the preview starts at the next free
+    // week-section (Sep 8) and runs a full month on the section grid.
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-09-08');
+    expect(placement?.endDate).toBe('2026-10-07');
+    expect(placement?.left).toBeCloseTo(484.5, 1);
+    expect(placement?.width).toBeCloseTo(114, 1);
+  });
+
+  it('keeps the month add preview capped to one month when the next order starts after it', () => {
+    fixture.componentRef.setInput('scale', Timescale.Month);
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-next',
+        name: 'Annual Review',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Complete,
+        startDate: '2026-10-19',
+        endDate: '2026-11-18',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt(114 * 4 + 114);
+
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-09-15');
+    expect(placement?.endDate).toBe('2026-10-14');
+    expect(placement?.left).toBeCloseTo(513, 1);
+    expect(placement?.width).toBeCloseTo(114, 1);
+  });
+
+  it('extends the month add preview backward to a full month when the next order is under a month ahead', () => {
+    fixture.componentRef.setInput('scale', Timescale.Month);
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-next',
+        name: 'Annual Review',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Complete,
+        startDate: '2026-10-10',
+        endDate: '2026-11-18',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt(114 * 4 + 114);
+
+    // A month forward from the cursor (Sep 15) would overrun the Oct 10 order's
+    // section, so the preview pins its end to the last free section (Oct 1-7)
+    // and backs up a full month.
+    const placement = component.hoverPlacement();
+    expect(placement?.startDate).toBe('2026-09-08');
+    expect(placement?.endDate).toBe('2026-10-07');
+  });
+
+  it('never previews a sub-week month pill, skipping a too-small gap', () => {
+    fixture.componentRef.setInput('scale', Timescale.Month);
+    // Two compact orders four days apart leave only a 3-day Oct 2-4 gap — below
+    // the one-week floor — so the preview backs out into the open month before
+    // them instead of rendering a sliver.
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-a',
+        name: 'Spot A',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-10-01',
+        endDate: '2026-10-01',
+      },
+      {
+        id: 'wo-b',
+        name: 'Spot B',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Blocked,
+        startDate: '2026-10-05',
+        endDate: '2026-10-05',
+      },
+    ]);
+    fixture.detectChanges();
+
+    moveRowAt(625); // over early October, where only the 3-day gap sits
+
+    const placement = component.hoverPlacement();
+    expect(placement).not.toBeNull();
+    const days =
+      (new Date(placement!.endDate).getTime() - new Date(placement!.startDate).getTime()) / 86_400_000 + 1;
+    expect(days).toBeGreaterThanOrEqual(7);
+    expect(placement!.endDate < '2026-10-01').toBeTrue();
   });
 
   it('does not skip the first free day after an existing work order', () => {
@@ -159,6 +238,38 @@ describe('ScheduleComponent', () => {
     expect(host.querySelector('.schedule__compact-header')?.textContent).toContain('Jun 1 - 2, 2026');
     expect(host.querySelector('.schedule__compact-header')?.textContent).toContain('2 total');
     expect(host.querySelectorAll('.schedule__compact-item').length).toBe(2);
+  });
+
+  it('compacts week orders of a week or less, keeping longer ones as named bars', () => {
+    fixture.componentRef.setInput('scale', Timescale.Week);
+    fixture.componentRef.setInput('timelineStartDate', '2026-06-01');
+    fixture.componentRef.setInput('timelineEndDate', '2026-09-30');
+    fixture.componentRef.setInput('workOrders', [
+      {
+        id: 'wo-7d',
+        name: 'Week Task',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.Open,
+        startDate: '2026-06-08',
+        endDate: '2026-06-14', // 7 days -> too narrow for a name -> compact
+      },
+      {
+        id: 'wo-8d',
+        name: 'Eight Day Task',
+        workCenterId: 'wc-1',
+        status: BadgeStatus.InProgress,
+        startDate: '2026-06-15',
+        endDate: '2026-06-22', // 8 days -> spans a second cell -> full bar
+      },
+    ]);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const bars = host.querySelectorAll<HTMLElement>('.schedule__bar');
+
+    expect(bars.length).toBe(1);
+    expect(bars[0].textContent).toContain('Eight Day Task');
+    expect(host.querySelectorAll('.schedule__compact-marker').length).toBe(1);
   });
 
   it('renders short month work orders as compact markers instead of full bars', () => {

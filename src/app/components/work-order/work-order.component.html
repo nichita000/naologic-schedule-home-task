@@ -4,6 +4,7 @@
   [naoTooltip]="tooltip()"
   naoTooltipPosition="top"
   [naoTooltipDebounce]="400"
+  [naoTooltipFollowPointer]="!!tooltip()"
 >
   <span class="nao-wo__name" [naoTooltip]="tooltip() ? '' : name()" naoTooltipPosition="top-left">{{ name() }}</span>
   <span class="nao-wo__status">{{ statusLabel }}</span>

@@ -28,7 +28,7 @@ import { Timescale } from '../timescale/timescale.component';
 import { TooltipDirective } from '../tooltip/tooltip.directive';
 import { BadgeStatus } from '../badge/badge.component';
 import { WorkOrderComponent } from '../work-order/work-order.component';
-import { daysBetween, durationInDays, parseIsoDate } from '../../utils/date-utils';
+import { addDays, daysBetween, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
 import { formatDateRangeShort } from '../../utils/format-date-range';
 import { InteractionLayerService } from '../../services/interaction-layer.service';
 
@@ -429,6 +429,7 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
   onTimelineScroll(event: Event): void {
     const element = event.target as HTMLElement;
+    this.interactionLayer?.suppressTooltipsForScroll();
     this.syncScrollLeft(element);
     this.requestRangeExtensionIfNeeded(element);
     this.trackMomentum(element);
@@ -812,12 +813,87 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     for (const index of candidates) {
       const left = index * step;
       const range = offsetRangeToDateRange(scale, this.timelineStartDate(), left, width);
+      if (scale === Timescale.Month) {
+        const monthPlacement = this.findAvailableMonthPlacement(range.startDate, orders);
+        if (monthPlacement) {
+          return monthPlacement;
+        }
+        continue;
+      }
+
       if (!this.overlapsAny(range.startDate, range.endDate, orders)) {
         return { left, width, ...range };
       }
     }
 
     return null;
+  }
+
+  /** The month add pill spans at most this many week-sections (one month). */
+  private static readonly MONTH_ADD_MAX_SLOTS = 4;
+
+  /**
+   * Sizes the month "add" pill on the same week-section grid the work-order
+   * bars snap to, so a pill placed in free sections can never visually overlap
+   * one. It fills the contiguous free run around the cursor, capped at a full
+   * month (4 sections) and floored at a week (1 section); a full month is
+   * preferred, pinning to the run's end and extending *backward* (still
+   * covering the cursor) rather than shrinking. An occupied cursor section
+   * returns null so the candidate search moves on.
+   */
+  private findAvailableMonthPlacement(
+    preferredStartDate: string,
+    orders: PlacedOrder[],
+  ): HoverPlacement | null {
+    const scale = this.rulerScale();
+    const slot = placementSlotWidthFor(scale);
+    const start = this.timelineStartDate();
+    const slotOf = (dateIso: string) => Math.round(dateToOffset(scale, start, dateIso) / slot);
+
+    const maxSlot = Math.round(this.timelineWidth() / slot) - 1;
+    const cursorSlot = slotOf(preferredStartDate);
+
+    if (cursorSlot < 0 || cursorSlot > maxSlot) {
+      return null;
+    }
+
+    // Sections covered by existing orders (bars span whole sections too).
+    const occupied = new Set<number>();
+    for (const order of orders) {
+      for (let s = slotOf(order.startDate); s <= slotOf(order.endDate); s += 1) {
+        occupied.add(s);
+      }
+    }
+
+    if (occupied.has(cursorSlot)) {
+      return null;
+    }
+
+    // Contiguous free run around the cursor's section.
+    let runStart = cursorSlot;
+    while (runStart - 1 >= 0 && !occupied.has(runStart - 1)) {
+      runStart -= 1;
+    }
+    let runEnd = cursorSlot;
+    while (runEnd + 1 <= maxSlot && !occupied.has(runEnd + 1)) {
+      runEnd += 1;
+    }
+
+    // Prefer a full month; pin to the run end and extend backward when it can't
+    // fit ahead, never spilling past the run's free start.
+    const span = Math.min(ScheduleComponent.MONTH_ADD_MAX_SLOTS, runEnd - runStart + 1);
+    let winStart = cursorSlot;
+    if (winStart + span - 1 > runEnd) {
+      winStart = runEnd - span + 1;
+    }
+    if (winStart < runStart) {
+      winStart = runStart;
+    }
+
+    const left = winStart * slot;
+    const width = span * slot;
+    const range = offsetRangeToDateRange(scale, start, left, width);
+    return { left, width, ...range };
   }
 
   private buildPlacementCandidateIndexes(preferredIndex: number, maxIndex: number): number[] {
@@ -837,17 +913,20 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
   /** Month-scale orders shorter than this render as pills instead of bars. */
   private static readonly MONTH_COMPACT_MAX_DAYS = 45;
+  /** Week-scale orders this short can't fit a name beside the badge + menu. */
+  private static readonly WEEK_COMPACT_MAX_DAYS = 7;
 
   /**
-   * Month: a bar needs ~45 days (≈1.5 month cells) before its name fits next
-   * to the status badge and menu, so anything shorter becomes a duration pill.
-   * Week: a ≤3-day order would misleadingly fill whole 150px week cells as a bar.
+   * A bar needs enough width to show its name beside the status badge and menu;
+   * shorter orders become compact markers instead. The cutoff is ~1.5 cells
+   * (~170px) in both scales: ~45 days at Month, and a week or less at Week,
+   * where a one-cell (≤150px) bar leaves no room for the name.
    */
   private isCompactOrder(order: ScheduleOrder): boolean {
     const duration = durationInDays(order.startDate, order.endDate);
     const scale = this.rulerScale();
     return (scale === Timescale.Month && duration < ScheduleComponent.MONTH_COMPACT_MAX_DAYS)
-      || (scale === Timescale.Week && duration <= 3);
+      || (scale === Timescale.Week && duration <= ScheduleComponent.WEEK_COMPACT_MAX_DAYS);
   }
 
   private compactMarkerLeft(order: PlacedOrder): number {

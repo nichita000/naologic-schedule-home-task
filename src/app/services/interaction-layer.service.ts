@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, OnDestroy, computed, signal } from '@angular/core';
 
 /**
  * Scoped interaction coordinator for overlay-heavy UI sections.
@@ -14,12 +14,15 @@ import { Injectable, computed, signal } from '@angular/core';
  * coordinated subtree.
  */
 @Injectable()
-export class InteractionLayerService {
+export class InteractionLayerService implements OnDestroy {
   private readonly activeOverlayId = signal<string | null>(null);
+  private readonly scrolling = signal(false);
+  private scrollTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly hasActiveOverlay = computed(() => this.activeOverlayId() !== null);
+  readonly isScrolling = computed(() => this.scrolling());
   readonly suppressBackgroundHover = this.hasActiveOverlay;
-  readonly suppressTooltips = this.hasActiveOverlay;
+  readonly suppressTooltips = computed(() => this.hasActiveOverlay() || this.isScrolling());
 
   openOverlay(id: string): void {
     this.activeOverlayId.set(id);
@@ -28,6 +31,32 @@ export class InteractionLayerService {
   closeOverlay(id?: string): void {
     if (!id || this.activeOverlayId() === id) {
       this.activeOverlayId.set(null);
+    }
+  }
+
+  /**
+   * Temporarily hides tooltips while a scrollable surface is moving. Tooltip
+   * anchors can be hundreds of pixels wide or virtualized during schedule
+   * scrolling; cancelling them for a short idle window avoids stale floating
+   * labels that appear detached from the cursor.
+   */
+  suppressTooltipsForScroll(durationMs = 160): void {
+    this.scrolling.set(true);
+
+    if (this.scrollTimer) {
+      clearTimeout(this.scrollTimer);
+    }
+
+    this.scrollTimer = setTimeout(() => {
+      this.scrollTimer = null;
+      this.scrolling.set(false);
+    }, durationMs);
+  }
+
+  ngOnDestroy(): void {
+    if (this.scrollTimer) {
+      clearTimeout(this.scrollTimer);
+      this.scrollTimer = null;
     }
   }
 }

@@ -1,4 +1,14 @@
-import { Directive, ElementRef, OnDestroy, OnInit, Renderer2, effect, inject, input } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  Renderer2,
+  booleanAttribute,
+  effect,
+  inject,
+  input,
+} from '@angular/core';
 import { InteractionLayerService } from '../../services/interaction-layer.service';
 
 export type TooltipPosition =
@@ -103,6 +113,11 @@ export class TooltipDirective implements OnInit, OnDestroy {
   readonly position = input<TooltipPosition>('top-left', { alias: 'naoTooltipPosition' });
   /** Delay in ms before the tooltip appears on hover (default 0 = instant). */
   readonly debounceMs = input<number>(0, { alias: 'naoTooltipDebounce' });
+  /** Anchor the tooltip to the latest pointer position instead of the host box. */
+  readonly followPointer = input<boolean, unknown>(false, {
+    alias: 'naoTooltipFollowPointer',
+    transform: booleanAttribute,
+  });
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly renderer = inject(Renderer2);
@@ -111,6 +126,7 @@ export class TooltipDirective implements OnInit, OnDestroy {
   private tip: HTMLElement | null = null;
   private showTimer: ReturnType<typeof setTimeout> | null = null;
   private cleanup: Array<() => void> = [];
+  private pointer: { x: number; y: number } | null = null;
 
   constructor() {
     effect(() => {
@@ -123,6 +139,7 @@ export class TooltipDirective implements OnInit, OnDestroy {
   ngOnInit(): void {
     const el = this.hostRef.nativeElement;
     this.cleanup.push(this.renderer.listen(el, 'mouseenter', () => this.scheduleShow()));
+    this.cleanup.push(this.renderer.listen(el, 'mousemove', (event: MouseEvent) => this.onPointerMove(event)));
     this.cleanup.push(this.renderer.listen(el, 'focusin', () => this.scheduleShow()));
     this.cleanup.push(this.renderer.listen(el, 'mouseleave', () => this.cancel()));
     this.cleanup.push(this.renderer.listen(el, 'focusout', () => this.cancel()));
@@ -154,6 +171,14 @@ export class TooltipDirective implements OnInit, OnDestroy {
   private cancel(): void {
     this.clearTimer();
     this.hide();
+    this.pointer = null;
+  }
+
+  private onPointerMove(event: MouseEvent): void {
+    this.pointer = { x: event.clientX, y: event.clientY };
+    if (this.tip && this.followPointer()) {
+      this.positionTip(this.tip);
+    }
   }
 
   private clearTimer(): void {
@@ -177,7 +202,14 @@ export class TooltipDirective implements OnInit, OnDestroy {
     this.renderer.setStyle(tip, 'opacity', '0');
     this.renderer.appendChild(document.body, tip);
 
-    const host = el.getBoundingClientRect();
+    this.positionTip(tip);
+
+    this.tip = tip;
+  }
+
+  private positionTip(tip: HTMLElement): void {
+    const el = this.hostRef.nativeElement;
+    const host = this.tooltipAnchorRect(el);
     const t = tip.getBoundingClientRect();
     const tipStyles = window.getComputedStyle(tip);
     const { left, top } = calculateTooltipPosition(
@@ -194,8 +226,6 @@ export class TooltipDirective implements OnInit, OnDestroy {
     this.renderer.setStyle(tip, 'left', `${left}px`);
     this.renderer.setStyle(tip, 'top', `${top}px`);
     this.renderer.setStyle(tip, 'opacity', '1');
-
-    this.tip = tip;
   }
 
   private hide(): void {
@@ -203,5 +233,20 @@ export class TooltipDirective implements OnInit, OnDestroy {
       this.tip.remove();
       this.tip = null;
     }
+  }
+
+  private tooltipAnchorRect(el: HTMLElement): TooltipRect {
+    if (this.followPointer() && this.pointer) {
+      return {
+        top: this.pointer.y,
+        right: this.pointer.x,
+        bottom: this.pointer.y,
+        left: this.pointer.x,
+        width: 0,
+        height: 0,
+      };
+    }
+
+    return el.getBoundingClientRect();
   }
 }

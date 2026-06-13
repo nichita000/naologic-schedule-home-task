@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Timescale } from '../timescale/timescale.component';
-import { addDays, daysBetween, parseIsoDate, startOfDay, startOfWeek, toIsoDate } from '../../utils/date-utils';
+import { addDays, daysBetween, durationInDays, parseIsoDate, startOfDay, startOfWeek, toIsoDate } from '../../utils/date-utils';
 
 export type ScheduleRulerScale = Exclude<Timescale, Timescale.Hour>;
 
@@ -271,9 +271,27 @@ export function slotToDateRange(
   }
 }
 
+/** Pixel width of one real calendar day inside the current scale. */
+export function dayWidthFor(scale: ScheduleRulerScale, dateIso?: string): number {
+  switch (scale) {
+    case Timescale.Day:
+      return DAY_CELL_WIDTH;
+    case Timescale.Week:
+      return WEEK_CELL_WIDTH / 7;
+    case Timescale.Month:
+    default: {
+      const date = dateIso ? parseIsoDate(dateIso) : new Date();
+      const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+      return MONTH_CELL_WIDTH / daysInMonth;
+    }
+  }
+}
+
 /**
- * Left/width of a work-order bar. Both ends snap to whole slots, and the end
- * date is inclusive — the bar covers the slot its end date falls in.
+ * Left/width of a work-order bar. Day and Week use real day boundaries so
+ * adjacent date ranges do not visually overlap. Month keeps its section-based
+ * snapping because that view intentionally groups long orders into coarse
+ * monthly chunks while short ones become compact markers.
  */
 export function placeBar(
   scale: ScheduleRulerScale,
@@ -281,6 +299,16 @@ export function placeBar(
   orderStart: string,
   orderEnd: string,
 ): { left: number; width: number } {
+  if (scale === Timescale.Day || scale === Timescale.Week) {
+    const start = startOfDay(parseIsoDate(startDate));
+    const orderStartDate = startOfDay(parseIsoDate(orderStart));
+    const dayWidth = dayWidthFor(scale);
+    return {
+      left: daysBetween(start, orderStartDate) * dayWidth,
+      width: Math.max(durationInDays(orderStart, orderEnd) * dayWidth, dayWidth),
+    };
+  }
+
   const left = dateToOffset(scale, startDate, orderStart);
   const endLeft = dateToOffset(scale, startDate, orderEnd);
   const slot = slotWidthFor(scale);

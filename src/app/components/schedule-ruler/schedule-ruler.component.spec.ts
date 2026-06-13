@@ -1,7 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Timescale } from '../timescale/timescale.component';
-import { buildRulerCells, offsetRangeToDateRange, slotToDateRange, ScheduleRulerComponent } from './schedule-ruler.component';
+import {
+  buildRulerCells,
+  offsetRangeToDateRange,
+  placeBar,
+  slotToDateRange,
+  ScheduleRulerComponent,
+} from './schedule-ruler.component';
 
 describe('ScheduleRulerComponent', () => {
   let fixture: ComponentFixture<ScheduleRulerComponent>;
@@ -90,5 +96,12 @@ describe('ScheduleRulerComponent', () => {
     expect(slot0.startDate).toBe('2026-01-01');
     expect(slot1.startDate).toBe('2026-01-08');
     expect(slot2.startDate).toBe('2026-01-15');
+  });
+
+  it('places week work-order bars by real day boundaries to avoid false visual overlap', () => {
+    const previous = placeBar(Timescale.Week, '2026-12-01', '2026-11-16', '2026-12-29');
+    const next = placeBar(Timescale.Week, '2026-12-01', '2026-12-30', '2027-01-10');
+
+    expect(previous.left + previous.width).toBeLessThanOrEqual(next.left);
   });
 });
