@@ -99,3 +99,10 @@
   min-height: calc(100% - 34px);
   background: #f7f9fc;
 }
+
+// ── Responsive ──────────────────────────────────────────────
+@media (max-width: 768px) {
+  .schedule {
+    min-height: calc(100vh - 140px);
+  }
+}

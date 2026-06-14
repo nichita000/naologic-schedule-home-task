@@ -135,3 +135,42 @@ $toolbar-shadow: 1px 2.5px 3px -1.5px rgba(200, 207, 233, 1);
     animation: none;
   }
 }
+
+// ── Responsive ──────────────────────────────────────────────
+@media (max-width: 768px) {
+  .nao-topbar {
+    padding-left: 16px;
+  }
+
+  .nao-page {
+    padding-left: 16px;
+
+    &__title {
+      margin-top: 24px;
+    }
+
+    &__toolbar {
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-right: 16px;
+      margin-top: 16px;
+      margin-bottom: 16px;
+    }
+
+    &__toolbar-status {
+      margin-left: 0;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .nao-page {
+    &__title {
+      font-size: var(--font-size-xl);
+    }
+
+    &__toolbar-status {
+      width: 100%;
+    }
+  }
+}

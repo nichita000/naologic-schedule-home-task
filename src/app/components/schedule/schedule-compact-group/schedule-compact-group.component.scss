@@ -340,3 +340,9 @@
     animation: none;
   }
 }
+
+@media (max-width: 768px) {
+  .schedule__compact-popover {
+    max-width: calc(100vw - 32px);
+  }
+}

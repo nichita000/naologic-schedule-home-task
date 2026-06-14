@@ -46,3 +46,33 @@
   flex: 1;
   background: #fff;
 }
+
+// ── Responsive ──────────────────────────────────────────────
+@media (max-width: 768px) {
+  :host {
+    width: 160px;
+  }
+
+  .schedule__head,
+  .schedule__wc {
+    padding: 0 12px;
+  }
+
+  .schedule__wc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  :host {
+    width: 120px;
+  }
+
+  .schedule__head,
+  .schedule__wc {
+    padding: 0 8px;
+    font-size: var(--font-size-sm);
+  }
+}
