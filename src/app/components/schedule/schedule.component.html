@@ -7,7 +7,21 @@
   />
 
   <div class="schedule__canvas">
-    <div class="schedule__timeline-scroll" #timelineScroll (scroll)="onTimelineScroll($event)">
+    <div
+      class="schedule__timeline-scroll"
+      #timelineScroll
+      naoTimelineScroll
+      [cellWidth]="cellWidth()"
+      [timelineWidth]="timelineWidth()"
+      [timelineStartDate]="timelineStartDate()"
+      [timelineEndDate]="timelineEndDate()"
+      [loadingSide]="timelineLoadingSide()"
+      [focusTarget]="focusTarget()"
+      [focusKey]="focusKey()"
+      [leadInTarget]="leadInTarget()"
+      [leadInKey]="leadInKey()"
+      (edgeReached)="timelineEdgeReached.emit($event)"
+    >
       <div class="schedule__timeline-track" [style.width.px]="timelineWidth()">
         @if (currentMarker(); as marker) {
           <div

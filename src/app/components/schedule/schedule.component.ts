@@ -1,17 +1,15 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
   HostListener,
-  OnDestroy,
   ViewChild,
   computed,
-  effect,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -37,6 +35,7 @@ import {
 } from './schedule-placement';
 import { ScheduleRowComponent } from './schedule-row/schedule-row.component';
 import { ScheduleSidebarComponent } from './schedule-sidebar/schedule-sidebar.component';
+import { FocusTarget, TimelineScrollDirective } from './timeline-scroll.directive';
 
 /** Which menu action fired on a work-order bar. */
 export type WorkOrderAction = 'edit' | 'delete';
@@ -92,16 +91,20 @@ export interface AddWorkOrderRequest {
     ScheduleRulerComponent,
     ScheduleRowComponent,
     ScheduleSidebarComponent,
+    TimelineScrollDirective,
   ],
   providers: [InteractionLayerService],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ScheduleComponent implements AfterViewInit, OnDestroy {
+export class ScheduleComponent {
   private readonly interactionLayer = inject(InteractionLayerService, { optional: true });
 
+  /** The scrollport element, used to position the compact popover. */
   @ViewChild('timelineScroll') private readonly timelineScroll?: ElementRef<HTMLElement>;
+  /** Owns scroll position, virtualisation window, edge preload and focus glide. */
+  private readonly scroller = viewChild(TimelineScrollDirective);
 
   /** Work centers shown in the frozen left column. */
   readonly workCenters = input<WorkCenter[]>([]);
@@ -135,42 +138,14 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   /** Free placement span of the hover "add" pill, or null when the cursor is over an occupied range. */
   readonly hoverPlacement = signal<HoverPlacement | null>(null);
   readonly activeCompactGroupId = signal<string | null>(null);
-  readonly visibleFocusedOrderId = signal<string | null>(null);
+  /** Order to pulse once a focus scroll settles — owned by the scroll directive. */
+  readonly visibleFocusedOrderId = computed(() => this.scroller()?.visibleFocusedOrderId() ?? null);
   /** Which way the open compact popover unfolds, so it stays inside the scrollport. */
   readonly compactPopoverFlip = signal<{ horizontal: boolean; vertical: boolean }>({ horizontal: false, vertical: false });
   /** Width cap for the open popover when the visible scrollport is narrower than its natural size. */
   readonly compactPopoverMaxWidth = signal<number>(ScheduleComponent.COMPACT_POPOVER_WIDTH);
   /** Marker button that opened the popover; focus returns here on Escape. */
   private compactTriggerElement: HTMLElement | null = null;
-  private readonly viewReady = signal(false);
-  private readonly scrollLeft = signal(0);
-  private readonly viewportWidth = signal(0);
-  private focusSettleTimer: ReturnType<typeof setTimeout> | null = null;
-  private cleanupFocusScroll: (() => void) | null = null;
-  private resizeObserver?: ResizeObserver;
-  private lastEdgeRequestKey: string | null = null;
-  private lastFocusScrollKey: string | null = null;
-  private lastLeadInScrollKey: string | null = null;
-  private previousTimelineStartDate: string | null = null;
-  private previousTimelineWidth: number | null = null;
-  private momentumRafId: number | null = null;
-  private lastTrackedScrollLeft = 0;
-  /**
-   * Set for the duration of one microtask cycle when a focus scroll has just
-   * been initiated. A range prepend in the same tick (saving an order dated
-   * before the range) must NOT apply scroll preservation then: the focus
-   * target is already in the new coordinate space, and an instant scrollLeft
-   * write would abort the in-flight smooth scroll.
-   */
-  private suppressScrollPreservation = false;
-  /**
-   * Focus targets farther than this many viewports teleport to the approach
-   * side of the target and smooth-scroll only the final stretch. Viewports,
-   * not years: the same number of years is 2.7k px at Month scale but 146k px
-   * at Day scale, while "two screens of glide" feels identical at any zoom.
-   * Matches the window's trailing buffer, so the glide is fully rendered.
-   */
-  private static readonly FOCUS_GLIDE_VIEWPORTS = 2;
   readonly interactionsLocked = computed(() =>
     (this.interactionLayer?.suppressBackgroundHover() ?? false) || !!this.timelineLoadingSide()
   );
@@ -197,13 +172,14 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
    * renders.
    */
   readonly renderWindow = computed<{ start: number; end: number }>(() => {
-    const viewport = this.viewportWidth();
+    const scroller = this.scroller();
+    const viewport = scroller?.viewportWidth() ?? 0;
 
     if (!viewport) {
       return { start: Number.NEGATIVE_INFINITY, end: Number.POSITIVE_INFINITY };
     }
 
-    const left = this.scrollLeft();
+    const left = scroller!.scrollLeft();
     return { start: left - viewport * 2, end: left + viewport * 3 };
   });
 
@@ -296,290 +272,32 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     return { left, label };
   });
 
-  constructor() {
-    effect(() => {
-      this.viewReady();
-      this.rulerScale();
-      this.timelineStartDate();
-      this.timelineEndDate();
-      this.currentDate();
-      this.timelineWidth();
-      this.focusDate();
-      this.focusRequestId();
-      this.focusedOrderId();
-
-      if (!this.viewReady()) {
-        return;
-      }
-
-      queueMicrotask(() => {
-        if (this.focusDate()) {
-          const focusKey = [
-            this.rulerScale(),
-            this.focusDate(),
-            this.focusRequestId(),
-            this.focusedOrderId(),
-          ].join(':');
-
-          if (focusKey !== this.lastFocusScrollKey) {
-            this.lastFocusScrollKey = focusKey;
-            this.scrollToFocusDate();
-          }
-          return;
-        }
-
-        const leadInKey = [
-          this.rulerScale(),
-          this.currentDate() ?? 'today',
-        ].join(':');
-
-        if (leadInKey !== this.lastLeadInScrollKey) {
-          this.lastLeadInScrollKey = leadInKey;
-          this.scrollToCurrentPeriodLeadIn();
-        }
-      });
-    });
-
-    effect(() => {
-      const startDate = this.timelineStartDate();
-      const width = this.timelineWidth();
-      this.viewReady();
-
-      const previousStartDate = this.previousTimelineStartDate;
-      const previousWidth = this.previousTimelineWidth;
-      this.previousTimelineStartDate = startDate;
-      this.previousTimelineWidth = width;
-
-      if (!this.viewReady() || !previousStartDate || previousWidth === null || startDate >= previousStartDate) {
-        return;
-      }
-
-      // Width delta of the actual cell grid, not a date conversion: week cells
-      // align to startOfWeek, so dateToOffset can be off by one cell at Week
-      // scale, which would desync the preserved scroll position.
-      const addedWidth = width - previousWidth;
-      queueMicrotask(() => this.preserveScrollAfterPrependedRange(addedWidth));
-    });
-
-    effect(() => {
-      // Re-arm edge requests whenever a load cycle ends. After a successful
-      // extension the range (and thus the key) changes anyway — this matters
-      // when a load fails and the range stays put: without it, that edge
-      // could never request again.
-      if (!this.timelineLoadingSide()) {
-        this.lastEdgeRequestKey = null;
-      }
-    });
-  }
-
-  ngAfterViewInit(): void {
-    this.viewReady.set(true);
-
-    const element = this.timelineScroll?.nativeElement;
-
-    if (!element) {
-      return;
+  /** Pixel target the scroll directive glides to; null when nothing is focused. */
+  readonly focusTarget = computed<FocusTarget | null>(() => {
+    const focusDate = this.focusDate();
+    if (!focusDate) {
+      return null;
     }
+    const left = dateToOffset(this.rulerScale(), this.timelineStartDate(), focusDate);
+    return { left: Math.max(left - this.cellWidth(), 0), orderId: this.focusedOrderId() };
+  });
 
-    this.viewportWidth.set(element.clientWidth);
+  /** A focus scroll runs only when this key changes. */
+  readonly focusKey = computed(() =>
+    [this.rulerScale(), this.focusDate(), this.focusRequestId(), this.focusedOrderId()].join(':')
+  );
 
-    if (typeof ResizeObserver === 'undefined') {
-      return;
-    }
+  /** Lead-in position used when nothing is focused (one cell before "today"). */
+  readonly leadInTarget = computed<number | null>(() => {
+    const marker = this.currentMarker();
+    return marker ? Math.max(marker.left - this.cellWidth(), 0) : null;
+  });
 
-    this.resizeObserver = new ResizeObserver(([entry]) => {
-      this.viewportWidth.set(entry.contentRect.width);
-    });
-    this.resizeObserver.observe(element);
-  }
-
-  ngOnDestroy(): void {
-    this.cancelPendingFocusAnimation();
-    this.resizeObserver?.disconnect();
-
-    if (this.momentumRafId !== null) {
-      cancelAnimationFrame(this.momentumRafId);
-      this.momentumRafId = null;
-    }
-  }
-
-  onTimelineScroll(event: Event): void {
-    const element = event.target as HTMLElement;
-    this.interactionLayer?.suppressTooltipsForScroll();
-    this.syncScrollLeft(element);
-    this.requestRangeExtensionIfNeeded(element);
-    this.trackMomentum(element);
-  }
-
-  private syncScrollLeft(element: HTMLElement): void {
-    this.lastTrackedScrollLeft = element.scrollLeft;
-    this.scrollLeft.set(element.scrollLeft);
-  }
-
-  /**
-   * Scroll events lag behind the compositor during a fast fling (and can be
-   * starved entirely while the main thread is busy), which lets the visual
-   * position outrun the render window. This per-frame tracker reads the real
-   * scrollLeft until it stops changing, so the window stays glued to whatever
-   * the user actually sees.
-   */
-  private trackMomentum(element: HTMLElement): void {
-    if (this.momentumRafId !== null || typeof requestAnimationFrame === 'undefined') {
-      return;
-    }
-
-    let idleFrames = 0;
-
-    const tick = () => {
-      if (element.scrollLeft !== this.lastTrackedScrollLeft) {
-        idleFrames = 0;
-        this.syncScrollLeft(element);
-      } else if (++idleFrames >= 3) {
-        this.momentumRafId = null;
-        return;
-      }
-
-      this.momentumRafId = requestAnimationFrame(tick);
-    };
-
-    this.momentumRafId = requestAnimationFrame(tick);
-  }
-
-  private requestRangeExtensionIfNeeded(element: HTMLElement): void {
-    if (this.timelineLoadingSide()) {
-      return;
-    }
-
-    const maxScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0);
-    const distanceToEnd = maxScrollLeft - element.scrollLeft;
-    const threshold = Math.max(element.clientWidth * 1.5, this.cellWidth() * 4);
-
-    const side =
-      element.scrollLeft <= threshold ? 'start' :
-        distanceToEnd <= threshold ? 'end' :
-          null;
-
-    if (!side) {
-      return;
-    }
-
-    const requestKey = `${side}:${this.timelineStartDate()}:${this.timelineEndDate()}`;
-    if (requestKey === this.lastEdgeRequestKey) {
-      return;
-    }
-
-    this.lastEdgeRequestKey = requestKey;
-    this.timelineEdgeReached.emit(side);
-  }
-
-  private preserveScrollAfterPrependedRange(addedWidth: number): void {
-    const element = this.timelineScroll?.nativeElement;
-
-    if (!element || addedWidth <= 0 || this.suppressScrollPreservation) {
-      return;
-    }
-
-    const nextScrollLeft = element.scrollLeft + addedWidth;
-    element.scrollLeft = nextScrollLeft;
-    this.syncScrollLeft(element);
-  }
+  readonly leadInKey = computed(() => [this.rulerScale(), this.currentDate() ?? 'today'].join(':'));
 
   private today(): Date {
     const value = this.currentDate();
     return value ? new Date(value) : new Date();
-  }
-
-  private scrollToCurrentPeriodLeadIn(): void {
-    const element = this.timelineScroll?.nativeElement;
-    const marker = this.currentMarker();
-
-    if (!element || !marker) {
-      return;
-    }
-
-    const target = Math.max(marker.left - this.cellWidth(), 0);
-    element.scrollLeft = target;
-    // Programmatic jumps move the render window immediately; waiting for the
-    // scroll event would leave the landing area unrendered for a frame.
-    this.scrollLeft.set(target);
-  }
-
-  private scrollToFocusDate(): void {
-    const element = this.timelineScroll?.nativeElement;
-    const focusDate = this.focusDate();
-    const focusedOrderId = this.focusedOrderId();
-
-    if (!element || !focusDate) {
-      return;
-    }
-
-    this.visibleFocusedOrderId.set(null);
-    this.cancelPendingFocusAnimation();
-
-    const left = dateToOffset(this.rulerScale(), this.timelineStartDate(), focusDate);
-    const target = Math.max(left - this.cellWidth(), 0);
-    const glideDistance = element.clientWidth * ScheduleComponent.FOCUS_GLIDE_VIEWPORTS;
-    const offset = target - element.scrollLeft;
-
-    if (Math.abs(offset) > glideDistance) {
-      // Distant target: teleport to the approach side first, then glide the
-      // final stretch. A smooth scroll across years of timeline gets
-      // compressed by the browser into an unreadable blur — a short glide
-      // over fully rendered content reads as "arriving at the order".
-      element.scrollLeft = target - Math.sign(offset) * glideDistance;
-      this.syncScrollLeft(element);
-    }
-
-    element.scrollTo({
-      left: target,
-      behavior: 'smooth',
-    });
-    // Render the destination right away so the smooth scroll lands on painted
-    // content instead of waiting for scroll events to move the window.
-    this.scrollLeft.set(target);
-
-    // The target is computed against the CURRENT (possibly just-prepended)
-    // range, so scroll preservation queued in this same tick must stand down.
-    this.suppressScrollPreservation = true;
-    queueMicrotask(() => {
-      this.suppressScrollPreservation = false;
-    });
-
-    if (focusedOrderId) {
-      this.runAfterScrollSettles(element, () => {
-        this.visibleFocusedOrderId.set(focusedOrderId);
-      });
-    }
-  }
-
-  private runAfterScrollSettles(element: HTMLElement, callback: () => void): void {
-    const finish = () => {
-      this.cancelPendingFocusAnimation();
-      callback();
-    };
-
-    const scheduleFinish = () => {
-      if (this.focusSettleTimer) {
-        clearTimeout(this.focusSettleTimer);
-      }
-      this.focusSettleTimer = setTimeout(finish, 120);
-    };
-
-    element.addEventListener('scroll', scheduleFinish, { passive: true });
-    this.cleanupFocusScroll = () => element.removeEventListener('scroll', scheduleFinish);
-
-    // If the target is already visible and no scroll event fires, still replay
-    // the focus pulse after a short beat.
-    scheduleFinish();
-  }
-
-  private cancelPendingFocusAnimation(): void {
-    if (this.focusSettleTimer) {
-      clearTimeout(this.focusSettleTimer);
-      this.focusSettleTimer = null;
-    }
-    this.cleanupFocusScroll?.();
-    this.cleanupFocusScroll = null;
   }
 
   @HostListener('document:click')

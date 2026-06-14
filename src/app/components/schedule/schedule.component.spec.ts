@@ -4,6 +4,7 @@ import { BadgeStatus } from '../badge/badge.component';
 import { Timescale } from '../timescale/timescale.component';
 import { WorkOrderComponent } from '../work-order/work-order.component';
 import { ScheduleComponent } from './schedule.component';
+import { TimelineScrollDirective } from './timeline-scroll.directive';
 
 describe('ScheduleComponent', () => {
   let fixture: ComponentFixture<ScheduleComponent>;
@@ -706,8 +707,9 @@ describe('ScheduleComponent', () => {
     ]);
     fixture.detectChanges();
 
-    (component as any).viewportWidth.set(400);
-    (component as any).scrollLeft.set(2000);
+    const dir = scrollDirective();
+    dir.viewportWidth.set(400);
+    dir.scrollLeft.set(2000);
     fixture.detectChanges();
 
     expect(component.visibleTimelineCells().length).toBeLessThan(component.timelineCells().length);
@@ -763,8 +765,9 @@ describe('ScheduleComponent', () => {
 
     // Window wide enough to reach both orders, so any exclusion below is the
     // range cull, not the virtualisation window.
-    (component as any).viewportWidth.set(4000);
-    (component as any).scrollLeft.set(0);
+    const dir = scrollDirective();
+    dir.viewportWidth.set(4000);
+    dir.scrollLeft.set(0);
     fixture.detectChanges();
 
     const bars = component.normalPlacedByCenter()['wc-1'];
@@ -782,20 +785,23 @@ describe('ScheduleComponent', () => {
     fixture.componentRef.setInput('timelineEndDate', '2026-01-31');
     fixture.detectChanges();
 
-    component.onTimelineScroll({
-      target: { scrollLeft: 100, scrollWidth: 6200, clientWidth: 1000 },
-    } as unknown as Event);
-    component.onTimelineScroll({
-      target: { scrollLeft: 120, scrollWidth: 6200, clientWidth: 1000 },
-    } as unknown as Event);
+    const dir = scrollDirective();
+    const element = fixture.nativeElement.querySelector('.schedule__timeline-scroll') as HTMLElement;
+    const scrollTo = (scrollLeft: number, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(element, 'scrollWidth', { value: scrollWidth, configurable: true });
+      Object.defineProperty(element, 'clientWidth', { value: clientWidth, configurable: true });
+      element.scrollLeft = scrollLeft;
+      dir.onScroll();
+    };
+
+    scrollTo(100, 6200, 1000);
+    scrollTo(120, 6200, 1000);
 
     expect(emitted).toEqual(['start']);
 
     fixture.componentRef.setInput('timelineStartDate', '2025-01-01');
     fixture.detectChanges();
-    component.onTimelineScroll({
-      target: { scrollLeft: 100, scrollWidth: 79_200, clientWidth: 1000 },
-    } as unknown as Event);
+    scrollTo(100, 79_200, 1000);
 
     expect(emitted).toEqual(['start', 'start']);
   });
@@ -807,5 +813,11 @@ describe('ScheduleComponent', () => {
         getBoundingClientRect: () => ({ left: 0 }),
       },
     } as unknown as MouseEvent, 'wc-1');
+  }
+
+  function scrollDirective(): TimelineScrollDirective {
+    return fixture.debugElement
+      .query(By.directive(TimelineScrollDirective))
+      .injector.get(TimelineScrollDirective);
   }
 });

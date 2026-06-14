@@ -66,17 +66,16 @@ export class ScheduleCompactGroupComponent {
   }
 
   statusColor(status: BadgeStatus): string {
-    switch (status) {
-      case BadgeStatus.Complete:
-        return 'var(--color-complete-text)';
-      case BadgeStatus.InProgress:
-        return 'var(--color-inprogress-text)';
-      case BadgeStatus.Blocked:
-        return 'var(--color-blocked-text)';
-      case BadgeStatus.Open:
-      default:
-        return 'var(--color-open-text)';
+    if (status === BadgeStatus.Complete) {
+      return 'var(--color-complete-text)';
     }
+    if (status === BadgeStatus.InProgress) {
+      return 'var(--color-inprogress-text)';
+    }
+    if (status === BadgeStatus.Blocked) {
+      return 'var(--color-blocked-text)';
+    }
+    return 'var(--color-open-text)';
   }
 
   onMarkerClick(event: MouseEvent): void {

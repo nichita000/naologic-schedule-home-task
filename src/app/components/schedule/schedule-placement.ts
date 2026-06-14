@@ -44,14 +44,13 @@ const MONTH_CELL_WIDTH = 114;
 
 /** Pixel width of one ruler cell at the given scale. */
 export function cellWidthFor(scale: ScheduleRulerScale): number {
-  switch (scale) {
-    case Timescale.Day:
-      return DAY_CELL_WIDTH;
-    case Timescale.Week:
-      return WEEK_CELL_WIDTH;
-    default:
-      return MONTH_CELL_WIDTH;
+  if (scale === Timescale.Day) {
+    return DAY_CELL_WIDTH;
   }
+  if (scale === Timescale.Week) {
+    return WEEK_CELL_WIDTH;
+  }
+  return MONTH_CELL_WIDTH;
 }
 
 /** The add-date pill is always one cell wide before it snaps/fills. */
