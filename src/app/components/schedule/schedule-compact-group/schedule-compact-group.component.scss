@@ -1,0 +1,342 @@
+// Container (the marker + popover wrapper). The host carries the per-marker
+// transform inline; positioning + stacking live here.
+:host {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 12;
+}
+
+// Lift the hovered/focused marker above overlapping neighbours so its dots and
+// badge are fully visible (an open popover still wins).
+:host(:hover),
+:host(:focus-within) {
+  z-index: 30;
+}
+
+:host(.schedule__compact--open) {
+  z-index: 35;
+}
+
+:host(.schedule__compact--focused) .schedule__compact-marker {
+  animation: schedule-focus-pulse 1.5s ease-out;
+}
+
+.schedule__compact-marker {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+
+  &:hover {
+    transform: scale(1.16);
+  }
+}
+
+:host(.schedule__compact--open) .schedule__compact-marker {
+  transform: scale(1.16);
+}
+
+// While interactions are locked, a non-open marker doesn't react to hover.
+:host(.is-locked:not(.schedule__compact--open)) .schedule__compact-marker:hover {
+  transform: none;
+}
+
+.schedule__compact-stack {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.schedule__compact-dot,
+.schedule__compact-count {
+  position: absolute;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+}
+
+.schedule__compact-dot {
+  background: var(--compact-status-color, var(--color-open-text));
+
+  &:nth-child(1) { left: 0; z-index: 1; }
+  &:nth-child(2) { left: 10px; z-index: 2; }
+}
+
+// Lone order: the dot stretches into a duration-proportional pill
+// (width set inline; 4px breathing room inside the button hit area).
+.schedule__compact-dot.schedule__compact-dot--pill {
+  left: 4px;
+}
+
+.schedule__compact-count {
+  left: 20px;
+  z-index: 3;
+  width: auto;
+  min-width: 26px;
+  padding: 0 6px;
+  background: var(--color-brand-500);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+// No `overflow: hidden` here — it would clip the soft shadows of the rows
+// inside; the 14/16px padding already keeps children off the rounded corners
+// and the list handles its own scrolling.
+.schedule__compact-popover {
+  position: absolute;
+  top: 24px;
+  left: -8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  // Natural size; an inline max-width caps it on narrow viewports.
+  width: 520px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e5e9f3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  color: #030929;
+  text-align: left;
+  cursor: default;
+  animation: schedule-compact-in 140ms ease-out;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 12px;
+    width: 10px;
+    height: 10px;
+    border-left: 1px solid #e5e9f3;
+    border-top: 1px solid #e5e9f3;
+    background: #fff;
+    transform: rotate(45deg);
+  }
+
+  &:hover {
+    border-color: #cfd5ff;
+    box-shadow: 0 20px 48px rgba(67, 56, 202, 0.18);
+  }
+
+  // Marker near the scrollport's right edge: unfold leftwards instead.
+  &--flip-x {
+    left: auto;
+    right: -8px;
+
+    &::before {
+      left: auto;
+      right: 12px;
+    }
+  }
+
+  // Marker near the scrollport's bottom edge: unfold upwards instead.
+  &--flip-y {
+    top: auto;
+    bottom: 24px;
+
+    &::before {
+      top: auto;
+      bottom: -5px;
+      transform: rotate(225deg);
+    }
+  }
+
+  // Capped width (narrow viewports): stack each item's date under its bar
+  // instead of squeezing three columns into too little space.
+  &--narrow .schedule__compact-item {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    row-gap: 4px;
+  }
+
+  &--narrow .schedule__compact-arrow {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  &--narrow .schedule__compact-date {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  &--single {
+    padding-top: 18px;
+  }
+}
+
+.schedule__compact-header {
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0 2px 8px;
+  background: #fff;
+}
+
+.schedule__compact-heading {
+  min-width: 0;
+  color: #030929;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.schedule__compact-range {
+  margin-left: 8px;
+  color: var(--color-gray-500);
+  font-weight: 400;
+}
+
+.schedule__compact-total {
+  color: var(--color-gray-500);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.schedule__compact-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 246px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 16px 10px 6px;
+  scrollbar-gutter: stable;
+  scrollbar-color: rgba(104, 113, 150, 0.42) transparent;
+  scrollbar-width: thin;
+}
+
+.schedule__compact-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.schedule__compact-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.schedule__compact-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(104, 113, 150, 0.42);
+}
+
+.schedule__compact-list--scrollable {
+  &::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 28px;
+    margin-top: -28px;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 78%);
+  }
+}
+
+.schedule__compact-item {
+  display: grid;
+  // The name column can shrink to nothing on capped-width popovers; the
+  // work-order bar inside truncates with an ellipsis.
+  grid-template-columns: minmax(0, 1fr) 136px 44px;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 2px 0;
+  color: #030929;
+  text-align: left;
+  cursor: default;
+}
+
+.schedule__compact-bar {
+  display: block;
+  min-width: 0;
+  padding: 2px 0 2px 2px;
+
+  ::ng-deep .nao-wo {
+    height: 34px;
+  }
+}
+
+.schedule__compact-arrow {
+  display: grid;
+  justify-self: center;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #eef0ff;
+  color: var(--color-brand-500);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition:
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast),
+    background-color var(--transition-fast);
+
+  &:hover,
+  &:focus-visible {
+    background: #e4e7ff;
+    box-shadow: 0 8px 18px rgba(79, 70, 229, 0.2);
+    transform: translateX(2px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(79, 70, 229, 0.38);
+    outline-offset: 3px;
+  }
+}
+
+.schedule__compact-date {
+  color: var(--color-gray-500);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+@keyframes schedule-compact-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes schedule-focus-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(79, 70, 229, 0));
+  }
+  35% {
+    filter: drop-shadow(0 0 16px rgba(79, 70, 229, 0.45));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(79, 70, 229, 0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule__compact-popover,
+  :host(.schedule__compact--focused) .schedule__compact-marker {
+    animation: none;
+  }
+}

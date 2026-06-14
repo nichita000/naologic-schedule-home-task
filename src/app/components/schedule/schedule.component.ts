@@ -18,9 +18,6 @@ import {
   buildRulerCells,
   dateToOffset,
   findCurrentCellLeft,
-  offsetRangeToDateRange,
-  placeBar,
-  placementSlotWidthFor,
   ScheduleRulerComponent,
   ScheduleRulerScale,
 } from '../schedule-ruler/schedule-ruler.component';
@@ -28,9 +25,19 @@ import { Timescale } from '../timescale/timescale.component';
 import { TooltipDirective } from '../tooltip/tooltip.directive';
 import { BadgeStatus } from '../badge/badge.component';
 import { WorkOrderComponent } from '../work-order/work-order.component';
-import { addDays, daysBetween, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
 import { formatDateRangeShort } from '../../utils/format-date-range';
 import { InteractionLayerService } from '../../services/interaction-layer.service';
+import { ScheduleCompactGroupComponent } from './schedule-compact-group/schedule-compact-group.component';
+import {
+  cellWidthFor,
+  compactMarkerLeft,
+  findAvailablePlacement,
+  groupCompactOrders,
+  HoverPlacement,
+  isCompactOrder,
+  placeOrdersByCenter,
+  PlacementContext,
+} from './schedule-placement';
 
 /** Which menu action fired on a work-order bar. */
 export type WorkOrderAction = 'edit' | 'delete';
@@ -77,17 +84,16 @@ export interface AddWorkOrderRequest {
   endDate: string;
 }
 
-interface HoverPlacement {
-  left: number;
-  width: number;
-  startDate: string;
-  endDate: string;
-}
-
 @Component({
   selector: 'nao-schedule',
   standalone: true,
-  imports: [CommonModule, ScheduleRulerComponent, TooltipDirective, WorkOrderComponent],
+  imports: [
+    CommonModule,
+    ScheduleCompactGroupComponent,
+    ScheduleRulerComponent,
+    TooltipDirective,
+    WorkOrderComponent,
+  ],
   providers: [InteractionLayerService],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
@@ -209,28 +215,18 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   });
 
   /** Work orders resolved to pixel positions, grouped by work-center id. */
-  readonly placedByCenter = computed<Record<string, PlacedOrder[]>>(() => {
-    const scale = this.rulerScale();
-    const start = this.timelineStartDate();
-    const map: Record<string, PlacedOrder[]> = {};
-    for (const center of this.workCenters()) {
-      map[center.id] = [];
-    }
-
-    for (const order of this.workOrders()) {
-      const { left, width } = placeBar(scale, start, order.startDate, order.endDate);
-      (map[order.workCenterId] ??= []).push({ ...order, left, width });
-    }
-    return map;
-  });
+  readonly placedByCenter = computed<Record<string, PlacedOrder[]>>(() =>
+    placeOrdersByCenter(this.rulerScale(), this.timelineStartDate(), this.workCenters(), this.workOrders())
+  );
 
   readonly normalPlacedByCenter = computed<Record<string, PlacedOrder[]>>(() => {
     const map: Record<string, PlacedOrder[]> = {};
+    const scale = this.rulerScale();
     const { start, end } = this.renderWindow();
     const trackWidth = this.timelineWidth();
     for (const center of this.workCenters()) {
       map[center.id] = (this.placedByCenter()[center.id] ?? [])
-        .filter(order => !this.isCompactOrder(order)
+        .filter(order => !isCompactOrder(scale, order)
           // Orders outside the declared timeline range (e.g. persisted future
           // orders restored before the range is re-extended) must never reach
           // the DOM: a bar past the track's width inflates scrollWidth and
@@ -250,21 +246,22 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
 
   readonly compactGroupsByCenter = computed<Record<string, CompactOrderGroup[]>>(() => {
     const map: Record<string, CompactPlacedOrder[]> = {};
+    const scale = this.rulerScale();
     const trackWidth = this.timelineWidth();
     for (const center of this.workCenters()) {
       map[center.id] = (this.placedByCenter()[center.id] ?? [])
         // Same range cull as full bars: compactMarkerLeft clamps to the track
         // edge, so an out-of-range order would otherwise pin a marker there.
-        .filter(order => this.isCompactOrder(order)
+        .filter(order => isCompactOrder(scale, order)
           && order.left < trackWidth
           && order.left + order.width > 0)
         .map(order => ({
           ...order,
-          markerLeft: this.compactMarkerLeft(order),
+          markerLeft: compactMarkerLeft(scale, trackWidth, order),
         }));
     }
 
-    const grouped = this.groupCompactOrders(map);
+    const grouped = groupCompactOrders(scale, this.timelineStartDate(), trackWidth, map);
     const { start, end } = this.renderWindow();
 
     for (const workCenterId of Object.keys(grouped)) {
@@ -280,28 +277,8 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   /** Widest a compact cluster marker can get (two dots + overflow count). */
   private static readonly COMPACT_CLUSTER_MAX_WIDTH = 60;
 
-  /** One-cell width for the active scale; the add pill is always this wide. */
-  readonly cellWidth = computed(() => {
-    switch (this.rulerScale()) {
-      case Timescale.Day:
-        return 200;
-      case Timescale.Week:
-        return 150;
-      default:
-        return 114;
-    }
-  });
-
-  readonly placementWidth = computed(() => {
-    switch (this.rulerScale()) {
-      case Timescale.Day:
-        return 200;
-      case Timescale.Week:
-        return 150;
-      default:
-        return 114;
-    }
-  });
+  /** One-cell width for the active scale, used by scroll lead-in maths. */
+  readonly cellWidth = computed(() => cellWidthFor(this.rulerScale()));
 
   /** Position + label of the "current period" marker (pill + vertical line). */
   readonly currentMarker = computed<{ left: number; label: string } | null>(() => {
@@ -647,7 +624,15 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    this.setHoverPlacement(this.findAvailablePlacement(x, orders));
+    this.setHoverPlacement(findAvailablePlacement(this.placementContext(), x, orders));
+  }
+
+  private placementContext(): PlacementContext {
+    return {
+      scale: this.rulerScale(),
+      timelineStartDate: this.timelineStartDate(),
+      timelineWidth: this.timelineWidth(),
+    };
   }
 
   clearHover(): void {
@@ -668,12 +653,10 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     this.orderAction.emit({ order, action });
   }
 
-  toggleCompactGroup(event: MouseEvent, group: CompactOrderGroup): void {
-    event.stopPropagation();
+  toggleCompactGroup(trigger: HTMLElement, group: CompactOrderGroup): void {
     const willOpen = this.activeCompactGroupId() !== group.id;
 
     if (willOpen) {
-      const trigger = event.currentTarget as HTMLElement;
       this.applyCompactPopoverLayout(trigger);
       this.compactTriggerElement = trigger;
     }
@@ -722,8 +705,7 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     this.compactPopoverMaxWidth.set(maxWidth);
   }
 
-  focusCompactOrder(event: MouseEvent, order: ScheduleOrder): void {
-    event.stopPropagation();
+  focusCompactOrder(order: ScheduleOrder): void {
     this.setActiveCompactGroup(null);
     this.compactOrderFocus.emit(order);
   }
@@ -751,337 +733,9 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     return !!focusedOrderId && group.orders.some(order => order.id === focusedOrderId);
   }
 
-  formatCompactGroupRange(group: CompactOrderGroup): string {
-    const sortedOrders = [...group.orders].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    const first = sortedOrders[0];
-    const last = sortedOrders[sortedOrders.length - 1];
-
-    if (!first || !last) {
-      return '';
-    }
-
-    return formatDateRangeShort(first.startDate, last.endDate);
-  }
-
-  formatCompactRange(order: ScheduleOrder): string {
-    return formatDateRangeShort(order.startDate, order.endDate);
-  }
-
   /** Hover tooltip for a full work-order bar: "Name · date range". */
   orderTooltip(order: ScheduleOrder): string {
     return `${order.name} · ${formatDateRangeShort(order.startDate, order.endDate)}`;
   }
 
-  /**
-   * Hover tooltip for a compact marker: lone pill → name + range,
-   * cluster → order count + covered range.
-   */
-  compactTooltip(group: CompactOrderGroup): string {
-    if (group.orders.length === 1) {
-      return this.orderTooltip(group.orders[0]);
-    }
-    return `${group.orders.length} work orders · ${this.formatCompactGroupRange(group)}`;
-  }
-
-  compactStatusColor(status: BadgeStatus): string {
-    switch (status) {
-      case BadgeStatus.Complete:
-        return 'var(--color-complete-text)';
-      case BadgeStatus.InProgress:
-        return 'var(--color-inprogress-text)';
-      case BadgeStatus.Blocked:
-        return 'var(--color-blocked-text)';
-      case BadgeStatus.Open:
-      default:
-        return 'var(--color-open-text)';
-    }
-  }
-
-  private findAvailablePlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
-    const scale = this.rulerScale();
-
-    if (scale === Timescale.Week) {
-      return this.findAvailableWeekPlacement(x, orders);
-    }
-
-    const width = this.placementWidth();
-    // The pill stays one cell wide, but its start snaps at slot granularity:
-    // whole cells for Day/Week, quarter-month "week" sections for Month.
-    const step = placementSlotWidthFor(scale);
-    const maxLeft = Math.max(0, this.timelineWidth() - width);
-    const maxIndex = Math.floor(maxLeft / step);
-    // Centre the pill on the cursor (snapped to the step grid). The candidate
-    // search below shifts it sideways when a neighbouring order is in the way.
-    const preferredIndex = Math.min(Math.max(0, Math.round((x - width / 2) / step)), maxIndex);
-    const candidates = this.buildPlacementCandidateIndexes(preferredIndex, maxIndex);
-
-    for (const index of candidates) {
-      const left = index * step;
-      const range = offsetRangeToDateRange(scale, this.timelineStartDate(), left, width);
-      if (scale === Timescale.Month) {
-        const monthPlacement = this.findAvailableMonthPlacement(range.startDate, orders);
-        if (monthPlacement) {
-          return monthPlacement;
-        }
-        continue;
-      }
-
-      if (!this.overlapsAny(range.startDate, range.endDate, orders)) {
-        return { left, width, ...range };
-      }
-    }
-
-    return null;
-  }
-
-  /** The week add pill spans from a useful 3-day range up to one week. */
-  private static readonly WEEK_ADD_MIN_DAYS = 3;
-  private static readonly WEEK_ADD_MAX_DAYS = 7;
-
-  /**
-   * Week view renders compact orders at day precision, so the add pill must do
-   * the same. It finds the nearest free day-run around the cursor, ignores tiny
-   * 1-2 day gaps, then fills 3-7 days *centred on the cursor*. When a centred
-   * pill would run into a neighbouring order it slides toward the free side,
-   * still covering the hovered day.
-   */
-  private findAvailableWeekPlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
-    const dayWidth = this.cellWidth() / 7;
-    const timelineStart = parseIsoDate(this.timelineStartDate());
-    const maxDay = Math.max(Math.ceil(this.timelineWidth() / dayWidth) - 1, 0);
-    const cursorDay = Math.min(Math.max(Math.floor(Math.max(0, x) / dayWidth), 0), maxDay);
-
-    const occupied = new Set<number>();
-    for (const order of orders) {
-      const startDay = daysBetween(timelineStart, parseIsoDate(order.startDate));
-      const endDay = daysBetween(timelineStart, parseIsoDate(order.endDate));
-      for (let day = startDay; day <= endDay; day += 1) {
-        occupied.add(day);
-      }
-    }
-
-    for (const candidateDay of this.buildPlacementCandidateIndexes(cursorDay, maxDay)) {
-      if (occupied.has(candidateDay)) {
-        continue;
-      }
-
-      let runStart = candidateDay;
-      while (runStart - 1 >= 0 && !occupied.has(runStart - 1)) {
-        runStart -= 1;
-      }
-
-      let runEnd = candidateDay;
-      while (runEnd + 1 <= maxDay && !occupied.has(runEnd + 1)) {
-        runEnd += 1;
-      }
-
-      const runLength = runEnd - runStart + 1;
-      if (runLength < ScheduleComponent.WEEK_ADD_MIN_DAYS) {
-        continue;
-      }
-
-      const span = Math.min(ScheduleComponent.WEEK_ADD_MAX_DAYS, runLength);
-      // Centre the pill on the cursor, then slide it inside the free run when
-      // an order crowds one side.
-      let startDay = candidateDay - Math.floor(span / 2);
-      if (startDay + span - 1 > runEnd) {
-        startDay = runEnd - span + 1;
-      }
-      if (startDay < runStart) {
-        startDay = runStart;
-      }
-
-      const startDate = addDays(timelineStart, startDay);
-      const endDate = addDays(startDate, span - 1);
-      return {
-        left: startDay * dayWidth,
-        width: span * dayWidth,
-        startDate: toIsoDate(startDate),
-        endDate: toIsoDate(endDate),
-      };
-    }
-
-    return null;
-  }
-
-  /** The month add pill spans at most this many week-sections (one month). */
-  private static readonly MONTH_ADD_MAX_SLOTS = 4;
-
-  /**
-   * Sizes the month "add" pill on the same week-section grid the work-order
-   * bars snap to, so a pill placed in free sections can never visually overlap
-   * one. It fills the contiguous free run around the cursor, capped at a full
-   * month (4 sections) and floored at a week (1 section); a full month is
-   * preferred, pinning to the run's end and extending *backward* (still
-   * covering the cursor) rather than shrinking. An occupied cursor section
-   * returns null so the candidate search moves on.
-   */
-  private findAvailableMonthPlacement(
-    preferredStartDate: string,
-    orders: PlacedOrder[],
-  ): HoverPlacement | null {
-    const scale = this.rulerScale();
-    const slot = placementSlotWidthFor(scale);
-    const start = this.timelineStartDate();
-    const slotOf = (dateIso: string) => Math.round(dateToOffset(scale, start, dateIso) / slot);
-
-    const maxSlot = Math.round(this.timelineWidth() / slot) - 1;
-    const cursorSlot = slotOf(preferredStartDate);
-
-    if (cursorSlot < 0 || cursorSlot > maxSlot) {
-      return null;
-    }
-
-    // Sections covered by existing orders (bars span whole sections too).
-    const occupied = new Set<number>();
-    for (const order of orders) {
-      for (let s = slotOf(order.startDate); s <= slotOf(order.endDate); s += 1) {
-        occupied.add(s);
-      }
-    }
-
-    if (occupied.has(cursorSlot)) {
-      return null;
-    }
-
-    // Contiguous free run around the cursor's section.
-    let runStart = cursorSlot;
-    while (runStart - 1 >= 0 && !occupied.has(runStart - 1)) {
-      runStart -= 1;
-    }
-    let runEnd = cursorSlot;
-    while (runEnd + 1 <= maxSlot && !occupied.has(runEnd + 1)) {
-      runEnd += 1;
-    }
-
-    // Prefer a full month; pin to the run end and extend backward when it can't
-    // fit ahead, never spilling past the run's free start.
-    const span = Math.min(ScheduleComponent.MONTH_ADD_MAX_SLOTS, runEnd - runStart + 1);
-    let winStart = cursorSlot;
-    if (winStart + span - 1 > runEnd) {
-      winStart = runEnd - span + 1;
-    }
-    if (winStart < runStart) {
-      winStart = runStart;
-    }
-
-    const left = winStart * slot;
-    const width = span * slot;
-    const range = offsetRangeToDateRange(scale, start, left, width);
-    return { left, width, ...range };
-  }
-
-  private buildPlacementCandidateIndexes(preferredIndex: number, maxIndex: number): number[] {
-    const indexes: number[] = [];
-    for (let distance = 0; preferredIndex - distance >= 0 || preferredIndex + distance <= maxIndex; distance += 1) {
-      const left = preferredIndex - distance;
-      const right = preferredIndex + distance;
-      if (left >= 0) indexes.push(left);
-      if (distance > 0 && right <= maxIndex) indexes.push(right);
-    }
-    return indexes;
-  }
-
-  private overlapsAny(startDate: string, endDate: string, orders: PlacedOrder[]): boolean {
-    return orders.some(order => startDate <= order.endDate && endDate >= order.startDate);
-  }
-
-  /** Month-scale orders shorter than this render as pills instead of bars. */
-  private static readonly MONTH_COMPACT_MAX_DAYS = 45;
-  /** Week-scale orders this short can't fit a name beside the badge + menu. */
-  private static readonly WEEK_COMPACT_MAX_DAYS = 7;
-
-  /**
-   * A bar needs enough width to show its name beside the status badge and menu;
-   * shorter orders become compact markers instead. The cutoff is ~1.5 cells
-   * (~170px) in both scales: ~45 days at Month, and a week or less at Week,
-   * where a one-cell (≤150px) bar leaves no room for the name.
-   */
-  private isCompactOrder(order: ScheduleOrder): boolean {
-    const duration = durationInDays(order.startDate, order.endDate);
-    const scale = this.rulerScale();
-    return (scale === Timescale.Month && duration < ScheduleComponent.MONTH_COMPACT_MAX_DAYS)
-      || (scale === Timescale.Week && duration <= ScheduleComponent.WEEK_COMPACT_MAX_DAYS);
-  }
-
-  private compactMarkerLeft(order: PlacedOrder): number {
-    const markerSize = 16;
-    const markerLeft = order.left + placementSlotWidthFor(this.rulerScale()) / 2 - markerSize / 2;
-    return Math.min(Math.max(markerLeft, 0), Math.max(this.timelineWidth() - markerSize, 0));
-  }
-
-  /** Minimum pill width — a 1-day order stays the classic round dot. */
-  private static readonly COMPACT_PILL_MIN_WIDTH = 16;
-
-  /**
-   * Duration-proportional pill for a lone compact order: a true miniature of
-   * the real bar — anchored at the order's day-exact start, one day ≈ cell
-   * width ÷ days per cell.
-   */
-  private compactPillMetrics(order: ScheduleOrder): { left: number; width: number } {
-    const duration = durationInDays(order.startDate, order.endDate);
-    const start = parseIsoDate(order.startDate);
-    const timelineStart = parseIsoDate(this.timelineStartDate());
-
-    let left: number;
-    let dayWidth: number;
-
-    if (this.rulerScale() === Timescale.Week) {
-      dayWidth = this.cellWidth() / 7;
-      left = daysBetween(timelineStart, start) * dayWidth;
-    } else {
-      const months = (start.getFullYear() - timelineStart.getFullYear()) * 12 + start.getMonth() - timelineStart.getMonth();
-      const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-      dayWidth = this.cellWidth() / daysInMonth;
-      left = months * this.cellWidth() + (start.getDate() - 1) * dayWidth;
-    }
-
-    const width = Math.max(duration * dayWidth, ScheduleComponent.COMPACT_PILL_MIN_WIDTH);
-    return {
-      left: Math.min(Math.max(left, 0), Math.max(this.timelineWidth() - width, 0)),
-      width,
-    };
-  }
-
-  private groupCompactOrders(map: Record<string, CompactPlacedOrder[]>): Record<string, CompactOrderGroup[]> {
-    const groupedByCenter: Record<string, CompactOrderGroup[]> = {};
-
-    for (const [workCenterId, orders] of Object.entries(map)) {
-      const groups = new Map<string, CompactPlacedOrder[]>();
-
-      for (const order of orders) {
-        const key = `${workCenterId}-${this.compactGroupKey(order)}`;
-        const group = groups.get(key) ?? [];
-        group.push(order);
-        groups.set(key, group);
-      }
-
-      groupedByCenter[workCenterId] = Array.from(groups.entries())
-        .map(([id, groupOrders]) => {
-          const sortedOrders = [...groupOrders].sort((a, b) => a.startDate.localeCompare(b.startDate));
-          // A lone order renders as a duration pill anchored at its exact
-          // start; clusters keep the slot-centred dot stack.
-          const pill = sortedOrders.length === 1 ? this.compactPillMetrics(sortedOrders[0]) : null;
-          return {
-            id,
-            workCenterId,
-            markerLeft: pill ? pill.left : sortedOrders[0]?.markerLeft ?? 0,
-            pillWidth: pill ? pill.width : null,
-            orders: sortedOrders,
-          };
-        })
-        .sort((a, b) => a.markerLeft - b.markerLeft);
-    }
-
-    return groupedByCenter;
-  }
-
-  /**
-   * Group by placement slot (week cell, or quarter-month section) so the
-   * marker always sits on the slot its orders actually occupy — a calendar
-   * month can hold up to four separate markers.
-   */
-  private compactGroupKey(order: CompactPlacedOrder): string {
-    return `${Math.floor(order.left / placementSlotWidthFor(this.rulerScale()))}`;
-  }
 }

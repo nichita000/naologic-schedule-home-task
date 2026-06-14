@@ -1,0 +1,80 @@
+<button
+  type="button"
+  class="schedule__compact-marker"
+  [class.schedule__compact-marker--pill]="group().pillWidth !== null"
+  [style.width.px]="group().pillWidth !== null ? group().pillWidth! + 8 : null"
+  [attr.aria-label]="tooltip()"
+  [attr.aria-expanded]="open()"
+  aria-haspopup="dialog"
+  [naoTooltip]="tooltip()"
+  naoTooltipPosition="top"
+  [naoTooltipDebounce]="300"
+  (click)="onMarkerClick($event)"
+>
+  <span class="schedule__compact-stack" aria-hidden="true">
+    @if (group().pillWidth !== null) {
+      <!-- Lone order: duration-proportional pill (1 day stays a dot). -->
+      <span
+        class="schedule__compact-dot schedule__compact-dot--pill"
+        [style.width.px]="group().pillWidth"
+        [style.--compact-status-color]="statusColor(group().orders[0].status)"
+      ></span>
+    } @else {
+      @for (order of visibleDots(); track order.id) {
+        <span
+          class="schedule__compact-dot"
+          [style.--compact-status-color]="statusColor(order.status)"
+        ></span>
+      }
+      @if (group().orders.length > 2) {
+        <!-- Remainder beyond the two visible dots, not the group total. -->
+        <span class="schedule__compact-count">+{{ group().orders.length - 2 }}</span>
+      }
+    }
+  </span>
+</button>
+
+@if (open()) {
+  <div
+    class="schedule__compact-popover"
+    role="dialog"
+    [attr.aria-label]="'Compact work orders for ' + workCenterName()"
+    [class.schedule__compact-popover--single]="group().orders.length === 1"
+    [class.schedule__compact-popover--flip-x]="flip().horizontal"
+    [class.schedule__compact-popover--flip-y]="flip().vertical"
+    [class.schedule__compact-popover--narrow]="maxWidth() < 420"
+    [style.maxWidth.px]="maxWidth()"
+    (click)="$event.stopPropagation()"
+  >
+    @if (group().orders.length > 1) {
+      <header class="schedule__compact-header">
+        <span class="schedule__compact-heading">
+          Work orders
+          <span class="schedule__compact-range">{{ groupRange() }}</span>
+        </span>
+        <span class="schedule__compact-total">{{ group().orders.length }} total</span>
+      </header>
+    }
+    <div
+      class="schedule__compact-list"
+      [class.schedule__compact-list--scrollable]="group().orders.length > 5"
+    >
+      @for (order of group().orders; track order.id) {
+        <div class="schedule__compact-item">
+          <span class="schedule__compact-bar">
+            <nao-work-order hideMenu [name]="order.name" [status]="order.status" />
+          </span>
+          <span class="schedule__compact-date">{{ range(order) }}</span>
+          <button
+            type="button"
+            class="schedule__compact-arrow"
+            [attr.aria-label]="'Focus ' + order.name"
+            (click)="onFocus($event, order)"
+          >
+            →
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

@@ -575,12 +575,13 @@ describe('ScheduleComponent', () => {
     ]);
     fixture.detectChanges();
 
-    const groups = component.compactGroupsByCenter()['wc-1'];
-    const pillGroup = groups.find(group => group.orders.length === 1 && group.orders[0].id === 'wo-pill')!;
-    const clusterGroup = groups.find(group => group.orders.length === 2)!;
+    const markerLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.schedule__compact-marker'),
+      marker => marker.getAttribute('aria-label'),
+    );
 
-    expect(component.compactTooltip(pillGroup)).toBe('Carton Restock · Aug 28 - Sep 4, 2026');
-    expect(component.compactTooltip(clusterGroup)).toBe('2 work orders · Oct 8 - 11, 2026');
+    expect(markerLabels).toContain('Carton Restock · Aug 28 - Sep 4, 2026');
+    expect(markerLabels).toContain('2 work orders · Oct 8 - 11, 2026');
 
     // The full bar passes its always-on tooltip down to the work-order component.
     const bar = fixture.debugElement.query(By.directive(WorkOrderComponent));
