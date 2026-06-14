@@ -14,7 +14,7 @@
   animation: nao-add-range-in 140ms ease-out;
 }
 
-.nao-add-range-pill__text {
+.nao-add-range-pill__text--pulse {
   animation: nao-add-range-text-in 140ms ease-out;
 }
 
@@ -42,7 +42,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nao-add-range-pill,
-  .nao-add-range-pill__text {
+  .nao-add-range-pill__text--pulse {
     animation: none;
   }
 }
