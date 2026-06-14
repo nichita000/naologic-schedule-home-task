@@ -841,8 +841,9 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
   /**
    * Week view renders compact orders at day precision, so the add pill must do
    * the same. It finds the nearest free day-run around the cursor, ignores tiny
-   * 1-2 day gaps, then fills 3-7 days. If the full week cannot fit ahead, it
-   * extends backward while still covering the hovered day.
+   * 1-2 day gaps, then fills 3-7 days *centred on the cursor*. When a centred
+   * pill would run into a neighbouring order it slides toward the free side,
+   * still covering the hovered day.
    */
   private findAvailableWeekPlacement(x: number, orders: PlacedOrder[]): HoverPlacement | null {
     const dayWidth = this.cellWidth() / 7;
@@ -880,7 +881,9 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
       }
 
       const span = Math.min(ScheduleComponent.WEEK_ADD_MAX_DAYS, runLength);
-      let startDay = candidateDay;
+      // Centre the pill on the cursor, then slide it inside the free run when
+      // an order crowds one side.
+      let startDay = candidateDay - Math.floor(span / 2);
       if (startDay + span - 1 > runEnd) {
         startDay = runEnd - span + 1;
       }
