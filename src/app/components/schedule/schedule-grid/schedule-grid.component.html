@@ -1,0 +1,19 @@
+@for (cell of cells(); track cell.key) {
+  @if (cell.left > 0) {
+    <span
+      class="schedule__vertical-line"
+      [style.transform]="'translateX(' + cell.left + 'px)'"
+    ></span>
+  }
+}
+<span
+  class="schedule__vertical-line"
+  [style.transform]="'translateX(' + timelineWidth() + 'px)'"
+></span>
+
+@if (currentMarker(); as marker) {
+  <span
+    class="schedule__current-line"
+    [style.transform]="'translateX(' + marker.left + 'px)'"
+  ></span>
+}

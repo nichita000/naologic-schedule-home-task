@@ -1,0 +1,47 @@
+@for (order of bars(); track order.id) {
+  <div
+    class="schedule__bar"
+    [style.width.px]="order.width - 8"
+    [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
+    [class.schedule__bar--focused]="focusedOrderId() === order.id"
+  >
+    <nao-work-order
+      [name]="order.name"
+      [status]="order.status"
+      [tooltip]="orderTooltip(order)"
+      (edit)="orderAction.emit({ order, action: 'edit' })"
+      (delete)="orderAction.emit({ order, action: 'delete' })"
+    />
+  </div>
+}
+
+@for (group of compactGroups(); track group.id) {
+  <nao-schedule-compact-group
+    [group]="group"
+    [open]="activeGroupId() === group.id"
+    [focused]="compactGroupHasFocusedOrder(group)"
+    [locked]="locked()"
+    [flip]="compactPopoverFlip()"
+    [maxWidth]="compactPopoverMaxWidth()"
+    [workCenterName]="workCenter().name"
+    (toggle)="compactToggle.emit({ trigger: $event, group })"
+    (focusOrder)="compactFocus.emit($event)"
+  />
+}
+
+@if (showAddPill() && hoverPlacement(); as placement) {
+  <!-- Keyed by slot so each snap recreates the element: it re-appears at the
+       new week instead of sliding across. -->
+  @for (slot of [placement]; track slot.left + '-' + slot.width) {
+    <button
+      type="button"
+      class="schedule__add"
+      [style.width.px]="slot.width - 16"
+      [style.transform]="'translate(' + (slot.left + 8) + 'px, -50%)'"
+      naoTooltip="Click to add dates"
+      naoTooltipPosition="top"
+      [naoTooltipDebounce]="400"
+      (click)="addWorkOrder.emit()"
+    ></button>
+  }
+}

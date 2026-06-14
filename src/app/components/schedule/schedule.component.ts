@@ -22,12 +22,9 @@ import {
   ScheduleRulerScale,
 } from '../schedule-ruler/schedule-ruler.component';
 import { Timescale } from '../timescale/timescale.component';
-import { TooltipDirective } from '../tooltip/tooltip.directive';
 import { BadgeStatus } from '../badge/badge.component';
-import { WorkOrderComponent } from '../work-order/work-order.component';
-import { formatDateRangeShort } from '../../utils/format-date-range';
 import { InteractionLayerService } from '../../services/interaction-layer.service';
-import { ScheduleCompactGroupComponent } from './schedule-compact-group/schedule-compact-group.component';
+import { ScheduleGridComponent } from './schedule-grid/schedule-grid.component';
 import {
   cellWidthFor,
   compactMarkerLeft,
@@ -38,6 +35,8 @@ import {
   placeOrdersByCenter,
   PlacementContext,
 } from './schedule-placement';
+import { ScheduleRowComponent } from './schedule-row/schedule-row.component';
+import { ScheduleSidebarComponent } from './schedule-sidebar/schedule-sidebar.component';
 
 /** Which menu action fired on a work-order bar. */
 export type WorkOrderAction = 'edit' | 'delete';
@@ -89,10 +88,10 @@ export interface AddWorkOrderRequest {
   standalone: true,
   imports: [
     CommonModule,
-    ScheduleCompactGroupComponent,
+    ScheduleGridComponent,
     ScheduleRulerComponent,
-    TooltipDirective,
-    WorkOrderComponent,
+    ScheduleRowComponent,
+    ScheduleSidebarComponent,
   ],
   providers: [InteractionLayerService],
   templateUrl: './schedule.component.html',
@@ -653,6 +652,14 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     this.orderAction.emit({ order, action });
   }
 
+  onRowOrderAction(event: { order: ScheduleOrder; action: WorkOrderAction }): void {
+    this.onOrderAction(event.order, event.action);
+  }
+
+  onCompactToggle(event: { trigger: HTMLElement; group: CompactOrderGroup }): void {
+    this.toggleCompactGroup(event.trigger, event.group);
+  }
+
   toggleCompactGroup(trigger: HTMLElement, group: CompactOrderGroup): void {
     const willOpen = this.activeCompactGroupId() !== group.id;
 
@@ -726,16 +733,6 @@ export class ScheduleComponent implements AfterViewInit, OnDestroy {
     this.addPreviewRangeChange.emit(
       placement ? { startDate: placement.startDate, endDate: placement.endDate } : null,
     );
-  }
-
-  compactGroupHasFocusedOrder(group: CompactOrderGroup): boolean {
-    const focusedOrderId = this.visibleFocusedOrderId();
-    return !!focusedOrderId && group.orders.some(order => order.id === focusedOrderId);
-  }
-
-  /** Hover tooltip for a full work-order bar: "Name · date range". */
-  orderTooltip(order: ScheduleOrder): string {
-    return `${order.name} · ${formatDateRangeShort(order.startDate, order.endDate)}`;
   }
 
 }

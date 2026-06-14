@@ -1,19 +1,10 @@
 <div class="schedule" [class.schedule--interactions-locked]="interactionsLocked()">
-  <!-- LEFT: frozen Work Center column -->
-  <aside class="schedule__sidebar">
-    <div class="schedule__head">Work Center</div>
-    @for (wc of workCenters(); track wc.id) {
-      <div
-        class="schedule__wc"
-        [class.schedule__wc--hovered]="hoveredRowId() === wc.id"
-        (mouseenter)="setHoveredRow(wc.id)"
-        (mouseleave)="setHoveredRow(null)"
-      >
-        {{ wc.name }}
-      </div>
-    }
-    <div class="schedule__sidebar-fill"></div>
-  </aside>
+  <nao-schedule-sidebar
+    [workCenters]="workCenters()"
+    [hoveredRowId]="hoveredRowId()"
+    [locked]="interactionsLocked()"
+    (rowHover)="setHoveredRow($event)"
+  />
 
   <div class="schedule__canvas">
     <div class="schedule__timeline-scroll" #timelineScroll (scroll)="onTimelineScroll($event)">
@@ -36,83 +27,32 @@
         />
 
         <div class="schedule__gantt-space">
-          <div class="schedule__vertical-lines">
-            @for (cell of visibleTimelineCells(); track cell.key) {
-              @if (cell.left > 0) {
-                <span
-                  class="schedule__vertical-line"
-                  [style.transform]="'translateX(' + cell.left + 'px)'"
-                ></span>
-              }
-            }
-            <span
-              class="schedule__vertical-line"
-              [style.transform]="'translateX(' + timelineWidth() + 'px)'"
-            ></span>
-
-            @if (currentMarker(); as marker) {
-              <span
-                class="schedule__current-line"
-                [style.transform]="'translateX(' + marker.left + 'px)'"
-              ></span>
-            }
-          </div>
+          <nao-schedule-grid
+            [cells]="visibleTimelineCells()"
+            [timelineWidth]="timelineWidth()"
+            [currentMarker]="currentMarker()"
+          />
 
           @for (wc of workCenters(); track wc.id) {
-            <div
-              class="schedule__gantt-row"
-              [class.schedule__gantt-row--hovered]="hoveredRowId() === wc.id"
-              (mousemove)="onRowMove($event, wc.id)"
-              (mouseleave)="clearHover()"
-            >
-              @for (order of normalPlacedByCenter()[wc.id]; track order.id) {
-                <div
-                  class="schedule__bar"
-                  [style.width.px]="order.width - 8"
-                  [style.transform]="'translate(' + (order.left + 4) + 'px, -50%)'"
-                  [class.schedule__bar--focused]="visibleFocusedOrderId() === order.id"
-                >
-                  <nao-work-order
-                    [name]="order.name"
-                    [status]="order.status"
-                    [tooltip]="orderTooltip(order)"
-                    (edit)="onOrderAction(order, 'edit')"
-                    (delete)="onOrderAction(order, 'delete')"
-                  />
-                </div>
-              }
-
-              @for (group of compactGroupsByCenter()[wc.id]; track group.id) {
-                <nao-schedule-compact-group
-                  [group]="group"
-                  [open]="activeCompactGroupId() === group.id"
-                  [focused]="compactGroupHasFocusedOrder(group)"
-                  [locked]="interactionsLocked()"
-                  [flip]="compactPopoverFlip()"
-                  [maxWidth]="compactPopoverMaxWidth()"
-                  [workCenterName]="wc.name"
-                  (toggle)="toggleCompactGroup($event, group)"
-                  (focusOrder)="focusCompactOrder($event)"
-                />
-              }
-
-              @if (!activeCompactGroupId() && hoveredRowId() === wc.id && hoverPlacement(); as placement) {
-                <!-- Keyed by slot so each snap recreates the element: it
-                     re-appears at the new week instead of sliding across. -->
-                @for (slot of [placement]; track slot.left + '-' + slot.width) {
-                  <button
-                    type="button"
-                    class="schedule__add"
-                    [style.width.px]="slot.width - 16"
-                    [style.transform]="'translate(' + (slot.left + 8) + 'px, -50%)'"
-                    naoTooltip="Click to add dates"
-                    naoTooltipPosition="top"
-                    [naoTooltipDebounce]="400"
-                    (click)="onAddWorkOrder(wc.id)"
-                  ></button>
-                }
-              }
-            </div>
+            <nao-schedule-row
+              [workCenter]="wc"
+              [bars]="normalPlacedByCenter()[wc.id]"
+              [compactGroups]="compactGroupsByCenter()[wc.id]"
+              [hoverPlacement]="hoverPlacement()"
+              [focusedOrderId]="visibleFocusedOrderId()"
+              [activeGroupId]="activeCompactGroupId()"
+              [compactPopoverFlip]="compactPopoverFlip()"
+              [compactPopoverMaxWidth]="compactPopoverMaxWidth()"
+              [hovered]="hoveredRowId() === wc.id"
+              [locked]="interactionsLocked()"
+              [showAddPill]="!activeCompactGroupId() && hoveredRowId() === wc.id"
+              (rowMove)="onRowMove($event, wc.id)"
+              (rowLeave)="clearHover()"
+              (orderAction)="onRowOrderAction($event)"
+              (addWorkOrder)="onAddWorkOrder(wc.id)"
+              (compactToggle)="onCompactToggle($event)"
+              (compactFocus)="focusCompactOrder($event)"
+            />
           }
         </div>
       </div>
