@@ -1,12 +1,12 @@
 <div class="schedule__head">Work Center</div>
-@for (wc of workCenters(); track wc.id) {
-  <div
-    class="schedule__wc"
-    [class.schedule__wc--hovered]="hoveredRowId() === wc.id"
-    (mouseenter)="rowHover.emit(wc.id)"
-    (mouseleave)="rowHover.emit(null)"
-  >
-    {{ wc.name }}
-  </div>
-}
+  @for (wc of workCenters(); track wc.id) {
+    <div
+      class="schedule__wc"
+      [class.schedule__wc--hovered]="hoveredRowId() === wc.id"
+      (mouseenter)="rowHover.emit(wc.id)"
+      (mouseleave)="rowHover.emit(null)"
+    >
+      {{ wc.name }}
+    </div>
+  }
 <div class="schedule__sidebar-fill"></div>
