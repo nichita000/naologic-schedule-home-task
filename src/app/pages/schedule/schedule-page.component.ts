@@ -16,7 +16,8 @@ import {
   WorkOrderDrawerValue,
 } from '../../components/work-order-drawer/work-order-drawer.component';
 import { WorkOrderDeleteDialogComponent } from '../../components/work-order-delete-dialog/work-order-delete-dialog.component';
-import { ScheduleStore } from '../../services/schedule.store';
+import { ScheduleDataService } from '../../services/schedule-data.service';
+import { LocalScheduleDataService } from '../../services/local-schedule-data.service';
 import { NotificationService } from '../../services/notification.service';
 import { addDays, addMonths, durationInDays, parseIsoDate, toIsoDate } from '../../utils/date-utils';
 import { formatDateRangeShort } from '../../utils/format-date-range';
@@ -36,9 +37,10 @@ import { formatDateRangeShort } from '../../utils/format-date-range';
   ],
   templateUrl: './schedule-page.component.html',
   styleUrl: './schedule-page.component.scss',
+  providers: [{ provide: ScheduleDataService, useClass: LocalScheduleDataService }],
 })
 export class SchedulePageComponent {
-  private readonly scheduleStore = inject(ScheduleStore);
+  private readonly scheduleStore = inject(ScheduleDataService);
   readonly notifications = inject(NotificationService);
 
   readonly timescale = signal<Timescale>(Timescale.Day);
@@ -85,9 +87,10 @@ export class SchedulePageComponent {
 
   focusCompactOrder(order: ScheduleOrder): void {
     // Zoom to the coarsest scale that still renders this order as a full bar:
-    // orders over 3 days fit the Week view; anything shorter needs Day.
+    // orders over 7 days fit the Week view; 7 days or fewer are still compact
+    // there, so go straight to Day.
     const duration = durationInDays(order.startDate, order.endDate);
-    this.timescale.set(duration <= 3 ? Timescale.Day : Timescale.Week);
+    this.timescale.set(duration <= 7 ? Timescale.Day : Timescale.Week);
     this.focusDate.set(order.startDate);
     this.focusedOrderId.set(order.id);
   }

@@ -2,7 +2,7 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { signal } from '@angular/core';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { SchedulePageComponent } from './schedule-page.component';
-import { ScheduleStore } from '../../services/schedule.store';
+import { ScheduleDataService } from '../../services/schedule-data.service';
 import { Timescale } from '../../components/timescale/timescale.component';
 import { BadgeStatus } from '../../components/badge/badge.component';
 import { WorkOrderDrawerValue } from '../../components/work-order-drawer/work-order-drawer.component';
@@ -39,10 +39,11 @@ describe('SchedulePageComponent', () => {
     TestBed.configureTestingModule({
       imports: [SchedulePageComponent],
       providers: [
-        { provide: ScheduleStore, useValue: mockStore },
         { provide: NotificationService, useValue: mockNotifications },
       ],
       schemas: [NO_ERRORS_SCHEMA],
+    }).overrideComponent(SchedulePageComponent, {
+      set: { providers: [{ provide: ScheduleDataService, useValue: mockStore }] },
     });
     const fixture = TestBed.createComponent(SchedulePageComponent);
     return { component: fixture.componentInstance, store: mockStore, notifications: mockNotifications };
@@ -378,13 +379,13 @@ describe('SchedulePageComponent', () => {
       endDate,
     });
 
-    it('zooms a 6-day order to Week scale (renders as a bar there)', () => {
+    it('zooms a 6-day order to Day scale (still compact at Week)', () => {
       const { component } = createComponent();
       component.timescale.set(Timescale.Month);
 
       component.focusCompactOrder(order('2026-09-22', '2026-09-27'));
 
-      expect(component.timescale()).toBe(Timescale.Week);
+      expect(component.timescale()).toBe(Timescale.Day);
       expect(component.focusDate()).toBe('2026-09-22');
       expect(component.focusedOrderId()).toBe('wo-x');
     });
@@ -409,13 +410,13 @@ describe('SchedulePageComponent', () => {
       expect(component.focusDate()).toBe('2026-11-02');
     });
 
-    it('zooms a 4-day month-boundary order to Week scale', () => {
+    it('zooms a 4-day month-boundary order to Day scale', () => {
       const { component } = createComponent();
       component.timescale.set(Timescale.Month);
 
       component.focusCompactOrder(order('2026-09-29', '2026-10-02'));
 
-      expect(component.timescale()).toBe(Timescale.Week);
+      expect(component.timescale()).toBe(Timescale.Day);
       expect(component.focusDate()).toBe('2026-09-29');
     });
 

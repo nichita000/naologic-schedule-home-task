@@ -1,15 +1,15 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { BadgeStatus } from '../components/badge/badge.component';
 import { ScheduleOrder, WorkCenter } from '../components/schedule/schedule.component';
 import { WORK_CENTERS, WORK_ORDERS } from '../data/schedule-seed';
 import { parseIsoDate } from '../utils/date-utils';
-import { LocalScheduleStorageService } from './local-schedule-storage.service';
+import { ScheduleDataService } from './schedule-data.service';
 
 export const REMOTE_LOAD_DELAY_MS = 650;
 
-@Injectable({ providedIn: 'root' })
-export class ScheduleStore {
-  private readonly storage = inject(LocalScheduleStorageService);
+const STORAGE_KEY = 'naologic.schedule.workOrders.v1';
+
+export class LocalScheduleDataService extends ScheduleDataService {
   private readonly loadedYears = new Set<number>();
   private readonly pendingYearLoads = new Map<number, Promise<void>>();
 
@@ -50,11 +50,6 @@ export class ScheduleStore {
     this.setWorkOrders(this.workOrdersState().filter(order => order.id !== id));
   }
 
-  /**
-   * Simulates a backend-backed year query. The schedule does not care whether
-   * this data came from LocalStorage, an in-memory seed, or HTTP; callers only
-   * await the range and render the resulting `workOrders` signal.
-   */
   loadWorkOrdersForYear(year: number): Promise<void> {
     if (this.loadedYears.has(year)) {
       return Promise.resolve();
@@ -78,10 +73,80 @@ export class ScheduleStore {
     return request;
   }
 
+  // ── localStorage helpers ──────────────────────────────────────
+
   private setWorkOrders(workOrders: ScheduleOrder[]): void {
     this.workOrdersState.set(workOrders);
-    this.storage.saveWorkOrders(workOrders);
+    this.saveToStorage(workOrders);
   }
+
+  private loadInitialWorkOrders(): ScheduleOrder[] {
+    const persisted = this.loadFromStorage();
+    if (persisted) {
+      for (const order of persisted) {
+        this.loadedYears.add(parseIsoDate(order.startDate).getFullYear());
+      }
+      return persisted;
+    }
+
+    const seeded = WORK_ORDERS.map(doc => ({
+      id: doc.docId,
+      name: doc.data.name,
+      workCenterId: doc.data.workCenterId,
+      status: doc.data.status as BadgeStatus,
+      startDate: doc.data.startDate,
+      endDate: doc.data.endDate,
+    }));
+
+    for (const order of seeded) {
+      this.loadedYears.add(parseIsoDate(order.startDate).getFullYear());
+    }
+
+    this.saveToStorage(seeded);
+    return seeded;
+  }
+
+  private loadFromStorage(): ScheduleOrder[] | null {
+    const storage = this.storage();
+    if (!storage) {
+      return null;
+    }
+
+    try {
+      const raw = storage.getItem(STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every(item => isScheduleOrder(item))) {
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveToStorage(workOrders: ScheduleOrder[]): void {
+    const storage = this.storage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(workOrders));
+    } catch {
+      // Storage can be unavailable in private mode or full-quota scenarios.
+    }
+  }
+
+  private storage(): Storage | null {
+    return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
+  }
+
+  // ── Remote simulation ─────────────────────────────────────────
 
   private mergeLoadedWorkOrders(orders: ScheduleOrder[]): void {
     if (!orders.length) {
@@ -125,23 +190,22 @@ export class ScheduleStore {
 
     return catalog[offset] ?? [];
   }
+}
 
-  private loadInitialWorkOrders(): ScheduleOrder[] {
-    const orders = this.storage.loadWorkOrders() ?? WORK_ORDERS.map(doc => ({
-      id: doc.docId,
-      name: doc.data.name,
-      workCenterId: doc.data.workCenterId,
-      status: doc.data.status as BadgeStatus,
-      startDate: doc.data.startDate,
-      endDate: doc.data.endDate,
-    }));
-
-    for (const order of orders) {
-      // parseIsoDate, not new Date(): bare ISO strings parse as UTC, which
-      // shifts Jan 1 into the previous year in western timezones.
-      this.loadedYears.add(parseIsoDate(order.startDate).getFullYear());
-    }
-
-    return orders;
+function isScheduleOrder(value: unknown): value is ScheduleOrder {
+  if (!value || typeof value !== 'object') {
+    return false;
   }
+
+  const order = value as Partial<ScheduleOrder>;
+  const statuses = Object.values(BadgeStatus);
+
+  return (
+    typeof order.id === 'string' &&
+    typeof order.name === 'string' &&
+    typeof order.workCenterId === 'string' &&
+    typeof order.startDate === 'string' &&
+    typeof order.endDate === 'string' &&
+    statuses.includes(order.status as BadgeStatus)
+  );
 }

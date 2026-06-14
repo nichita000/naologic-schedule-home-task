@@ -1,14 +1,23 @@
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { BadgeStatus } from '../components/badge/badge.component';
+import { ScheduleOrder } from '../components/schedule/schedule.component';
 import { WORK_ORDERS } from '../data/schedule-seed';
-import { REMOTE_LOAD_DELAY_MS, ScheduleStore } from './schedule.store';
+import { ScheduleDataService } from './schedule-data.service';
+import { LocalScheduleDataService, REMOTE_LOAD_DELAY_MS } from './local-schedule-data.service';
 
 const STORAGE_KEY = 'naologic.schedule.workOrders.v1';
 
-describe('ScheduleStore', () => {
+describe('LocalScheduleDataService', () => {
   afterEach(() => {
     localStorage.removeItem(STORAGE_KEY);
     TestBed.resetTestingModule();
+  });
+
+  it('seeds localStorage on first load when empty', () => {
+    const service = createService();
+
+    expect(service.workOrders().length).toBe(WORK_ORDERS.length);
+    expect(readStoredOrders().length).toBe(WORK_ORDERS.length);
   });
 
   it('loads persisted work orders instead of seed data', () => {
@@ -23,9 +32,9 @@ describe('ScheduleStore', () => {
       },
     ]));
 
-    const store = createStore();
+    const service = createService();
 
-    expect(store.workOrders()).toEqual([
+    expect(service.workOrders()).toEqual([
       {
         id: 'wo-persisted',
         name: 'Persisted Order',
@@ -39,9 +48,9 @@ describe('ScheduleStore', () => {
 
   it('persists created, updated and deleted work orders', () => {
     spyOn(Date, 'now').and.returnValue(123);
-    const store = createStore();
+    const service = createService();
 
-    const created = store.createWorkOrder({
+    const created = service.createWorkOrder({
       name: 'Night Shift Audit',
       workCenterId: 'wc-4',
       status: BadgeStatus.Blocked,
@@ -51,7 +60,7 @@ describe('ScheduleStore', () => {
 
     expect(readStoredOrders().some(order => order.id === 'wo-123')).toBeTrue();
 
-    store.updateWorkOrder({
+    service.updateWorkOrder({
       ...created,
       name: 'Updated Night Shift Audit',
       status: BadgeStatus.Complete,
@@ -63,7 +72,7 @@ describe('ScheduleStore', () => {
       status: BadgeStatus.Complete,
     });
 
-    store.deleteWorkOrder('wo-123');
+    service.deleteWorkOrder('wo-123');
 
     expect(readStoredOrders().some(order => order.id === 'wo-123')).toBeFalse();
   });
@@ -71,39 +80,41 @@ describe('ScheduleStore', () => {
   it('falls back to seed data when persisted data is invalid', () => {
     localStorage.setItem(STORAGE_KEY, '{nope');
 
-    const store = createStore();
+    const service = createService();
 
-    expect(store.workOrders().length).toBe(WORK_ORDERS.length);
+    expect(service.workOrders().length).toBe(WORK_ORDERS.length);
   });
 
   it('loads remote future work orders with a fake delay', fakeAsync(() => {
     const currentYear = new Date().getFullYear();
-    const store = createStore();
-    const initialCount = store.workOrders().length;
+    const service = createService();
+    const initialCount = service.workOrders().length;
     let loaded = false;
 
-    store.loadWorkOrdersForYear(currentYear + 3).then(() => {
+    service.loadWorkOrdersForYear(currentYear + 3).then(() => {
       loaded = true;
     });
 
     tick(REMOTE_LOAD_DELAY_MS - 1);
 
     expect(loaded).toBeFalse();
-    expect(store.workOrders().length).toBe(initialCount);
+    expect(service.workOrders().length).toBe(initialCount);
 
     tick(1);
 
     expect(loaded).toBeTrue();
-    expect(store.workOrders().some(order => order.id === `remote-${currentYear + 3}-extrusion-run`)).toBeTrue();
+    expect(service.workOrders().some(order => order.id === `remote-${currentYear + 3}-extrusion-run`)).toBeTrue();
     expect(readStoredOrders().some(order => order.id === `remote-${currentYear + 3}-extrusion-run`)).toBeTrue();
   }));
 
-  function createStore(): ScheduleStore {
-    TestBed.configureTestingModule({});
-    return TestBed.inject(ScheduleStore);
+  function createService(): ScheduleDataService {
+    TestBed.configureTestingModule({
+      providers: [{ provide: ScheduleDataService, useClass: LocalScheduleDataService }],
+    });
+    return TestBed.inject(ScheduleDataService);
   }
 
-  function readStoredOrders(): ReturnType<ScheduleStore['workOrders']> {
+  function readStoredOrders(): ScheduleOrder[] {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
   }
 });

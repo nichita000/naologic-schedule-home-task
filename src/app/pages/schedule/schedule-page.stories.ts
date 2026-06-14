@@ -5,7 +5,7 @@ import { BadgeStatus } from '../../components/badge/badge.component';
 import { ScheduleOrder, WorkCenter } from '../../components/schedule/schedule.component';
 import { WORK_CENTERS, WORK_ORDERS } from '../../data/schedule-seed';
 import { NotificationService, NotificationType } from '../../services/notification.service';
-import { ScheduleStore } from '../../services/schedule.store';
+import { ScheduleDataService } from '../../services/schedule-data.service';
 import { SchedulePageComponent } from './schedule-page.component';
 
 type NotificationStoryArgs = {
@@ -76,7 +76,7 @@ const meta: Meta<SchedulePageNotificationStoryComponent> = {
   decorators: [
     applicationConfig({
       providers: [
-        { provide: ScheduleStore, useFactory: createScheduleStoreStub },
+        { provide: ScheduleDataService, useFactory: createScheduleStoreStub },
       ],
     }),
   ],
