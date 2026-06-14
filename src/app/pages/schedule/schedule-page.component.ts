@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { TimescaleComponent, Timescale } from '../../components/timescale/timescale.component';
 import { StatusFilterComponent, StatusFilterValue } from '../../components/status-filter/status-filter.component';
+import { AddRangePillComponent } from '../../components/add-range-pill/add-range-pill.component';
+import { ToolbarAlertComponent } from '../../components/toolbar-alert/toolbar-alert.component';
 import {
   AddWorkOrderRequest,
   ScheduleComponent,
@@ -25,9 +26,10 @@ import { formatDateRangeShort } from '../../utils/format-date-range';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     TimescaleComponent,
     StatusFilterComponent,
+    AddRangePillComponent,
+    ToolbarAlertComponent,
     ScheduleComponent,
     WorkOrderDrawerComponent,
     WorkOrderDeleteDialogComponent,

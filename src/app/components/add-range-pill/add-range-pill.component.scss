@@ -1,0 +1,48 @@
+.nao-add-range-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 118px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--color-gray-100);
+  color: var(--color-gray-500);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  white-space: nowrap;
+  animation: nao-add-range-in 140ms ease-out;
+}
+
+.nao-add-range-pill__text {
+  animation: nao-add-range-text-in 140ms ease-out;
+}
+
+@keyframes nao-add-range-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nao-add-range-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nao-add-range-pill,
+  .nao-add-range-pill__text {
+    animation: none;
+  }
+}

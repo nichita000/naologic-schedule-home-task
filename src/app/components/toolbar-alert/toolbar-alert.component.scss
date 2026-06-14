@@ -1,0 +1,103 @@
+.nao-toolbar-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  max-width: min(360px, calc(100vw - 360px));
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--color-gray-100);
+  color: var(--color-open-text);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  white-space: nowrap;
+  animation: nao-toolbar-alert-in 140ms ease-out;
+}
+
+.nao-toolbar-alert--success { color: var(--color-complete-text); }
+.nao-toolbar-alert--error { color: var(--color-error-text); }
+.nao-toolbar-alert--warning { color: var(--color-blocked-text); }
+.nao-toolbar-alert--info { color: var(--color-open-text); }
+
+.nao-toolbar-alert__message {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  animation: nao-toolbar-alert-text-in 160ms ease-out;
+}
+
+.nao-toolbar-alert__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.nao-toolbar-alert__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.62;
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+
+  &:hover {
+    background: rgba(104, 113, 150, 0.12);
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(79, 70, 229, 0.28);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes nao-toolbar-alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nao-toolbar-alert-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nao-toolbar-alert,
+  .nao-toolbar-alert__message {
+    animation: none;
+  }
+}
